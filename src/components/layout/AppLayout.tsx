@@ -1,11 +1,7 @@
-import type { ReactNode } from 'react'
+import { Outlet } from 'react-router-dom'
 import BottomNav from './BottomNav'
 
-interface Props {
-  children: ReactNode
-}
-
-export default function AppLayout({ children }: Props) {
+export default function AppLayout() {
   return (
     <div
       className="min-h-dvh flex flex-col"
@@ -14,9 +10,9 @@ export default function AppLayout({ children }: Props) {
       {/* Page content — padded at bottom to clear the fixed nav */}
       <main
         className="flex-1 flex flex-col"
-        style={{ paddingBottom: 'calc(64px + env(safe-area-inset-bottom))' }}
+        style={{ paddingBottom: 'calc(72px + env(safe-area-inset-bottom))' }}
       >
-        {children}
+        <Outlet />
       </main>
 
       <BottomNav />

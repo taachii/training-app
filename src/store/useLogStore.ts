@@ -1,23 +1,69 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { WorkoutLog } from '@/types/workout'
+import type { WorkoutLog, LoggedExercise } from '@/types/workout'
 import type { PersonalRecord } from '@/types/ranks'
 import type { ProgressionState } from '@/types/progression'
 import { PROGRESSION_DEFAULTS } from '@/types/progression'
 
+// ─────────────────────────────────────────────
+// HELPERS — derive effective weight from actual log
+// ─────────────────────────────────────────────
+
+/**
+ * Derive the "reference weight" from a logged exercise.
+ *
+ * Strategy: use the weight from the heaviest COMPLETED set.
+ * This respects the user's inline edits during the session —
+ * the algorithm always works from what was ACTUALLY done,
+ * never from blueprint assumptions.
+ */
+function deriveEffectiveWeight(logged: LoggedExercise): number {
+  const completed = logged.actualSets.filter((s) => s.completed && s.weight > 0)
+  if (completed.length === 0) return logged.plannedWeight
+  return Math.max(...completed.map((s) => s.weight))
+}
+
+/**
+ * Round a weight to the nearest 0.25 kg (quarter-plate precision).
+ */
+function roundWeight(kg: number): number {
+  return Math.round(kg * 4) / 4
+}
+
+// ─────────────────────────────────────────────
+// STORE
+// ─────────────────────────────────────────────
+
 interface LogState {
   logs: WorkoutLog[]
-  personalRecords: Record<string, PersonalRecord>   // keyed by exerciseId
+  personalRecords: Record<string, PersonalRecord>     // keyed by exerciseId
   progressionStates: Record<string, ProgressionState> // keyed by exerciseId
 
   addLog: (log: WorkoutLog) => void
-  updateProgressionAfterSession: (exerciseId: string, success: boolean, currentWeight: number) => void
+
+  /**
+   * Update progression state after a session exercise is completed.
+   *
+   * KEY ARCHITECTURE DECISION:
+   * - Progression is always calculated from ACTUAL logged data (loggedExercise)
+   * - The user's inline edits (weight, reps, added/removed sets) are the ground truth
+   * - The blueprint/plan values are only used as initial suggestions
+   * - success flag is set explicitly by the user (checkbox: "Udało się!") in the session
+   *
+   * Rules:
+   *   success = true  → effectiveWeight + 2.5 kg next time (reset consecutiveFails to 0)
+   *   success = false → no weight change; consecutiveFails++
+   *   consecutiveFails >= 2 → deload -10% (round to 0.25 kg), reset consecutiveFails to 0
+   */
+  updateProgressionAfterSession: (loggedExercise: LoggedExercise) => void
+
   updatePersonalRecord: (pr: PersonalRecord) => void
+  clearLogs: () => void
 }
 
 export const useLogStore = create<LogState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       logs: [],
       personalRecords: {},
       progressionStates: {},
@@ -25,25 +71,36 @@ export const useLogStore = create<LogState>()(
       addLog: (log) =>
         set((s) => ({ logs: [log, ...s.logs] })),
 
-      updateProgressionAfterSession: (exerciseId, success, currentWeight) =>
+      updateProgressionAfterSession: (logged) =>
         set((s) => {
+          const effectiveWeight = deriveEffectiveWeight(logged)
+          const exerciseId = logged.exerciseId
+
           const prev = s.progressionStates[exerciseId] ?? {
             exerciseId,
-            currentWeight,
+            currentWeight: effectiveWeight,
             consecutiveFails: 0,
             lastUpdated: new Date().toISOString(),
           }
 
-          let nextWeight = prev.currentWeight
-          let consecutiveFails = success ? 0 : prev.consecutiveFails + 1
+          let nextWeight: number
+          let consecutiveFails: number
 
-          if (success) {
-            nextWeight = prev.currentWeight + PROGRESSION_DEFAULTS.successIncrement
-          } else if (consecutiveFails >= PROGRESSION_DEFAULTS.deloadTrigger) {
-            nextWeight = Math.round(
-              prev.currentWeight * (1 - PROGRESSION_DEFAULTS.deloadFraction) * 2,
-            ) / 2 // round to nearest 0.5 kg
+          if (logged.success) {
+            // ✅ SUCCESS: bump weight, reset fail counter
+            nextWeight = roundWeight(effectiveWeight + PROGRESSION_DEFAULTS.successIncrement)
             consecutiveFails = 0
+          } else {
+            consecutiveFails = prev.consecutiveFails + 1
+
+            if (consecutiveFails >= PROGRESSION_DEFAULTS.deloadTrigger) {
+              // ❌❌ DELOAD: 2nd consecutive fail → -10%, reset counter
+              nextWeight = roundWeight(effectiveWeight * (1 - PROGRESSION_DEFAULTS.deloadFraction))
+              consecutiveFails = 0
+            } else {
+              // ❌ 1st fail: keep the same weight, no change
+              nextWeight = effectiveWeight
+            }
           }
 
           const updated: ProgressionState = {
@@ -66,12 +123,34 @@ export const useLogStore = create<LogState>()(
             personalRecords: { ...s.personalRecords, [pr.exerciseId]: pr },
           }
         }),
+
+      clearLogs: () =>
+        set({ logs: [], personalRecords: {}, progressionStates: {} }),
     }),
     { name: 'training-app-logs' },
   ),
 )
 
-/** Convenience selector — returns suggested next weight for an exercise */
+// ─────────────────────────────────────────────
+// SELECTORS
+// ─────────────────────────────────────────────
+
+/**
+ * Returns the suggested starting weight for the next session.
+ * This is the algorithm's SUGGESTION — the user is free to override it inline.
+ */
 export function useSuggestedWeight(exerciseId: string, fallbackWeight: number): number {
-  return useLogStore((s) => s.progressionStates[exerciseId]?.currentWeight ?? fallbackWeight)
+  return useLogStore(
+    (s) => s.progressionStates[exerciseId]?.currentWeight ?? fallbackWeight,
+  )
+}
+
+/**
+ * Returns the number of consecutive failures for an exercise.
+ * Used to show deload warning in UI.
+ */
+export function useConsecutiveFails(exerciseId: string): number {
+  return useLogStore(
+    (s) => s.progressionStates[exerciseId]?.consecutiveFails ?? 0,
+  )
 }

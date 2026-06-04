@@ -1,7 +1,9 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import AppLayout from '@/components/layout/AppLayout'
+import AppLayout    from '@/components/layout/AppLayout'
 import HomePage     from '@/pages/HomePage'
 import CalendarPage from '@/pages/CalendarPage'
+import PlansPage    from '@/pages/PlansPage'
+import PlanFormPage from '@/pages/PlanFormPage'
 import SessionPage  from '@/pages/SessionPage'
 import StatsPage    from '@/pages/StatsPage'
 import ProfilePage  from '@/pages/ProfilePage'
@@ -9,17 +11,22 @@ import ProfilePage  from '@/pages/ProfilePage'
 export default function App() {
   return (
     <BrowserRouter>
-      <AppLayout>
-        <Routes>
+      <Routes>
+        {/* Pages with BottomNav */}
+        <Route element={<AppLayout />}>
           <Route path="/"         element={<HomePage />}     />
           <Route path="/calendar" element={<CalendarPage />} />
-          <Route path="/session"  element={<SessionPage />}  />
+          <Route path="/plans"    element={<PlansPage />}    />
           <Route path="/stats"    element={<StatsPage />}    />
           <Route path="/profile"  element={<ProfilePage />}  />
-          {/* 404 fallback */}
           <Route path="*"         element={<HomePage />}     />
-        </Routes>
-      </AppLayout>
+        </Route>
+
+        {/* Full-screen pages (no BottomNav) */}
+        <Route path="/plans/new"        element={<PlanFormPage />} />
+        <Route path="/plans/:id/edit"   element={<PlanFormPage />} />
+        <Route path="/session/*"        element={<SessionPage />}  />
+      </Routes>
     </BrowserRouter>
   )
 }

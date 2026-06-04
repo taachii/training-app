@@ -10,7 +10,7 @@ import {
 const NAV_ITEMS = [
   { to: '/',          label: 'Home',      Icon: Home        },
   { to: '/calendar',  label: 'Kalendarz', Icon: CalendarDays },
-  { to: '/session',   label: 'Trening',   Icon: Dumbbell    },
+  { to: '/plans',     label: 'Plany',     Icon: Dumbbell    },
   { to: '/stats',     label: 'Statsy',    Icon: BarChart2   },
   { to: '/profile',   label: 'Profil',    Icon: User        },
 ] as const
