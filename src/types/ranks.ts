@@ -11,18 +11,18 @@ export type RankTier =
   | 'diamond'
   | 'emerald'
   | 'ruby'
-  | 'opal'
-  | 'damascus'
+  | 'amethyst'  // deep neon violet — second highest
+  | 'obsidian'  // darkest elite — highest attainable
 
 export interface RankDefinition {
   tier: RankTier
   label: string
   /** Minimum Wilks points needed (inclusive) */
   minPoints: number
-  /** Maximum Wilks points (exclusive); Infinity for Damascus */
+  /** Maximum Wilks points (exclusive); Infinity for Obsidian */
   maxPoints: number
-  /** Tailwind / CSS colour token key (maps to --color-rank-*) */
-  colorKey: string
+  /** CSS color value for badges, glows, and charts */
+  color: string
   /** Display emoji */
   emoji: string
 }
@@ -33,7 +33,7 @@ export interface RankResult {
   wilksPoints: number
   oneRepMax: number
   definition: RankDefinition
-  /** Points needed to reach next tier (0 if Damascus) */
+  /** Points needed to reach next tier (0 if Obsidian) */
   pointsToNextTier: number
   /** Progress within current tier 0–1 */
   tierProgress: number

@@ -1,18 +1,6 @@
 /**
  * Wilks Calculator — Official Formula (2020 update)
- *
- * Reference: Robert Wilks (Powerlifting Australia)
- * Coefficients: https://wilkscalculator.com / IPF Technical Rules
- *
- * Formula:
- *   Wilks Points = lifted_kg × (500 / polynomial(bodyweight_kg))
- *
- * The polynomial is a degree-5 polynomial with gender-specific coefficients.
- * This normalises lifted weight against bodyweight, enabling cross-class comparison.
- *
- * Usage in TrainingApp:
- *   - Input:  gender, body weight (kg), calculated 1RM via Epley formula
- *   - Output: Wilks points → mapped to RPG rank tier
+ * Updated rank ladder: Bronze → Silver → Gold → Platinum → Diamond → Emerald → Ruby → Amethyst → Obsidian
  */
 
 import type { Gender } from '@/types/profile'
@@ -22,7 +10,6 @@ import type { RankDefinition, RankResult, RankTier } from '@/types/ranks'
 // WILKS POLYNOMIAL COEFFICIENTS
 // ─────────────────────────────────────────────
 
-/** Coefficients for MALES */
 const MALE_COEFFS = {
   a: -216.0475144,
   b:   16.2606339,
@@ -32,7 +19,6 @@ const MALE_COEFFS = {
   f:   -1.291e-8,
 } as const
 
-/** Coefficients for FEMALES */
 const FEMALE_COEFFS = {
   a:  594.31747775582,
   b:  -27.23842536447,
@@ -43,26 +29,90 @@ const FEMALE_COEFFS = {
 } as const
 
 // ─────────────────────────────────────────────
-// RANK THRESHOLDS (Wilks points)
+// RANK DEFINITIONS (per-exercise Wilks points)
 // ─────────────────────────────────────────────
-//
-// These are per-exercise single-lift thresholds.
-// For a standard powerlifting TOTAL multiply by ~2.7 for reference.
-//
-// Calibrated for main compound lifts (Squat, Bench, Deadlift, OHP).
-// Bodyweight exercises use a separate rep-based system (see getRepRank).
 
 export const RANK_DEFINITIONS: RankDefinition[] = [
-  { tier: 'unranked',  label: 'Unranked',  minPoints: 0,   maxPoints: 50,   colorKey: 'muted',    emoji: '⬛' },
-  { tier: 'bronze',    label: 'Bronze',    minPoints: 50,  maxPoints: 100,  colorKey: 'bronze',   emoji: '🟫' },
-  { tier: 'silver',    label: 'Silver',    minPoints: 100, maxPoints: 150,  colorKey: 'silver',   emoji: '⬜' },
-  { tier: 'gold',      label: 'Gold',      minPoints: 150, maxPoints: 200,  colorKey: 'gold',     emoji: '🟨' },
-  { tier: 'platinum',  label: 'Platinum',  minPoints: 200, maxPoints: 260,  colorKey: 'platinum', emoji: '🩵' },
-  { tier: 'diamond',   label: 'Diamond',   minPoints: 260, maxPoints: 320,  colorKey: 'diamond',  emoji: '💎' },
-  { tier: 'emerald',   label: 'Emerald',   minPoints: 320, maxPoints: 380,  colorKey: 'emerald',  emoji: '💚' },
-  { tier: 'ruby',      label: 'Ruby',      minPoints: 380, maxPoints: 440,  colorKey: 'ruby',     emoji: '❤️' },
-  { tier: 'opal',      label: 'Opal',      minPoints: 440, maxPoints: 500,  colorKey: 'opal',     emoji: '🌈' },
-  { tier: 'damascus',  label: 'Damascus',  minPoints: 500, maxPoints: Infinity, colorKey: 'damascus', emoji: '⚫' },
+  {
+    tier: 'unranked',
+    label: 'Unranked',
+    minPoints: 0,
+    maxPoints: 50,
+    color: '#6b7280',
+    emoji: '⬛',
+  },
+  {
+    tier: 'bronze',
+    label: 'Bronze',
+    minPoints: 50,
+    maxPoints: 100,
+    color: '#cd7f32',
+    emoji: '🟫',
+  },
+  {
+    tier: 'silver',
+    label: 'Silver',
+    minPoints: 100,
+    maxPoints: 150,
+    color: '#c0c0c0',
+    emoji: '⬜',
+  },
+  {
+    tier: 'gold',
+    label: 'Gold',
+    minPoints: 150,
+    maxPoints: 200,
+    color: '#ffd700',
+    emoji: '🟨',
+  },
+  {
+    tier: 'platinum',
+    label: 'Platinum',
+    minPoints: 200,
+    maxPoints: 260,
+    color: '#4fc3f7',
+    emoji: '🩵',
+  },
+  {
+    tier: 'diamond',
+    label: 'Diamond',
+    minPoints: 260,
+    maxPoints: 320,
+    color: '#b9f2ff',
+    emoji: '💎',
+  },
+  {
+    tier: 'emerald',
+    label: 'Emerald',
+    minPoints: 320,
+    maxPoints: 380,
+    color: '#50fa7b',
+    emoji: '💚',
+  },
+  {
+    tier: 'ruby',
+    label: 'Ruby',
+    minPoints: 380,
+    maxPoints: 440,
+    color: '#ff5555',
+    emoji: '❤️‍🔥',
+  },
+  {
+    tier: 'amethyst',
+    label: 'Amethyst',
+    minPoints: 440,
+    maxPoints: 500,
+    color: '#9333ea',   // deep neon violet
+    emoji: '💜',
+  },
+  {
+    tier: 'obsidian',
+    label: 'Obsidian',
+    minPoints: 500,
+    maxPoints: Infinity,
+    color: '#581c87',   // deep, shimmering dark with purple glow
+    emoji: '🖤',
+  },
 ]
 
 // ─────────────────────────────────────────────
@@ -71,18 +121,12 @@ export const RANK_DEFINITIONS: RankDefinition[] = [
 
 /**
  * Calculate Wilks points for a single lift.
- *
- * @param gender       - 'male' | 'female'
- * @param bodyWeightKg - Athlete's body weight in kg (must be 20–300 range)
- * @param liftedKg     - Calculated 1RM in kg (e.g. via Epley formula)
- * @returns Wilks score (floating point, typically 0–700+ range)
  */
 export function calculateWilks(
   gender: Gender,
   bodyWeightKg: number,
   liftedKg: number,
 ): number {
-  // Guard: formula is only valid within reasonable BW range
   const bw = Math.max(20, Math.min(bodyWeightKg, 300))
   const coeffs = gender === 'male' ? MALE_COEFFS : FEMALE_COEFFS
 
@@ -95,16 +139,11 @@ export function calculateWilks(
     coeffs.f * bw ** 5
 
   if (denominator <= 0) return 0
-
   return (liftedKg * 500) / denominator
 }
 
 /**
  * Calculate 1RM using the Epley formula.
- *
- * @param weight - Weight lifted (kg)
- * @param reps   - Repetitions performed (must be ≥ 1)
- * @returns Estimated 1RM in kg
  */
 export function calculateEpley1RM(weight: number, reps: number): number {
   if (reps <= 0) return 0
@@ -116,23 +155,16 @@ export function calculateEpley1RM(weight: number, reps: number): number {
  * Look up the RankDefinition for a given Wilks score.
  */
 export function getRankDefinition(wilksPoints: number): RankDefinition {
-  // Iterate in reverse to find the highest tier that the score qualifies for
   for (let i = RANK_DEFINITIONS.length - 1; i >= 0; i--) {
     if (wilksPoints >= RANK_DEFINITIONS[i].minPoints) {
       return RANK_DEFINITIONS[i]
     }
   }
-  return RANK_DEFINITIONS[0] // unranked fallback
+  return RANK_DEFINITIONS[0]
 }
 
 /**
- * Full rank computation for a barbell / dumbbell exercise.
- *
- * @param gender       - Athlete's gender
- * @param bodyWeightKg - Athlete's body weight in kg
- * @param weight       - Weight lifted in the best set (kg)
- * @param reps         - Reps performed in the best set
- * @returns RankResult with all relevant data
+ * Full rank computation for a barbell/dumbbell exercise.
  */
 export function computeRank(
   gender: Gender,
@@ -170,25 +202,22 @@ export function computeRank(
 }
 
 // ─────────────────────────────────────────────
-// BODYWEIGHT / REP-BASED RANK (Pull-ups, Dips)
+// BODYWEIGHT / REP-BASED RANK
 // ─────────────────────────────────────────────
 
 const REP_RANK_THRESHOLDS: Array<{ tier: RankTier; minReps: number }> = [
-  { tier: 'unranked', minReps: 0  },
-  { tier: 'bronze',   minReps: 1  },
-  { tier: 'silver',   minReps: 5  },
-  { tier: 'gold',     minReps: 10 },
-  { tier: 'platinum', minReps: 15 },
-  { tier: 'diamond',  minReps: 20 },
-  { tier: 'emerald',  minReps: 25 },
-  { tier: 'ruby',     minReps: 30 },
-  { tier: 'opal',     minReps: 35 },
-  { tier: 'damascus', minReps: 40 },
+  { tier: 'unranked',  minReps: 0  },
+  { tier: 'bronze',    minReps: 1  },
+  { tier: 'silver',    minReps: 5  },
+  { tier: 'gold',      minReps: 10 },
+  { tier: 'platinum',  minReps: 15 },
+  { tier: 'diamond',   minReps: 20 },
+  { tier: 'emerald',   minReps: 25 },
+  { tier: 'ruby',      minReps: 30 },
+  { tier: 'amethyst',  minReps: 35 },
+  { tier: 'obsidian',  minReps: 40 },
 ]
 
-/**
- * Rank for bodyweight exercises (Pull-ups, Dips, etc.) based on clean reps.
- */
 export function getRepRank(reps: number): RankDefinition {
   let tierKey: RankTier = 'unranked'
   for (const threshold of REP_RANK_THRESHOLDS) {
