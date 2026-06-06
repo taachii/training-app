@@ -43,7 +43,3 @@ src/
 ├── pages/          # Strony aplikacji (router)
 └── types/          # Globalne typy TypeScript
 ```
-
-## Plan wdrożenia
-
-Szczegółowy plan rozbity na 10 kroków — patrz `implementation_plan.md` (Antigravity artifact).
