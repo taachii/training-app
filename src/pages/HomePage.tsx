@@ -1,28 +1,22 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Dumbbell, TrendingUp, Trophy, Zap, Clock } from 'lucide-react'
+import { Clock, User } from 'lucide-react'
 import { useProfileStore, useLevelProgress, useXpForNextLevel } from '@/store/useProfileStore'
 import { useSessionStore } from '@/store/useSessionStore'
 import LevelBadge from '@/components/ui/LevelBadge'
 import { getLevelMeta } from '@/lib/xpSystem'
-
-const FEATURE_CARDS = [
-  { icon: Dumbbell,   label: 'Plany treningowe',  description: 'Blueprinty i ćwiczenia', color: '#6366f1' },
-  { icon: TrendingUp, label: 'Progresja',          description: '+2.5 kg per sukces',     color: '#10b981' },
-  { icon: Trophy,     label: 'System rang',        description: 'Bronze → Obsidian',      color: '#fbbf24' },
-  { icon: Zap,        label: 'Aktywna sesja',      description: 'Timer i kolejka ćwiczeń', color: '#8b5cf6' },
-]
+import WeeklyCalendarWidget from '@/components/home/WeeklyCalendarWidget'
+import RanksOverviewWidget from '@/components/home/RanksOverviewWidget'
 
 export default function HomePage() {
-  const profile    = useProfileStore((s) => s.profile)
-  const name       = profile?.name ?? 'Atleta'
-  const level      = profile?.level ?? 1
-  const xp         = profile?.xp ?? 0
-  const streak     = profile?.workoutStreak ?? 0
-  const xpForNext  = useXpForNextLevel()
+  const profile = useProfileStore((s) => s.profile)
+  const name = profile?.name ?? 'taachii'
+  const level = profile?.level ?? 1
+  const xp = profile?.xp ?? 0
+  const xpForNext = useXpForNextLevel()
   const lvlProgress = useLevelProgress()
-  const levelMeta  = getLevelMeta(level)
-  const navigate   = useNavigate()
+  const levelMeta = getLevelMeta(level)
+  const navigate = useNavigate()
   const { session } = useSessionStore()
 
   const [elapsedSec, setElapsedSec] = useState(0)
@@ -74,9 +68,6 @@ export default function HomePage() {
 
         {/* Greeting */}
         <div className="flex-1 min-w-0">
-          <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-            {new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' })}
-          </p>
           <h1
             className="text-2xl font-bold leading-tight truncate"
             style={{ fontFamily: 'var(--font-display)', color: 'var(--color-text-primary)' }}
@@ -95,14 +86,18 @@ export default function HomePage() {
             >
               Lv.{level} {levelMeta.label}
             </span>
-            {/* Streak */}
-            {streak > 0 && (
-              <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                🔥 {streak}w streak
-              </span>
-            )}
           </div>
         </div>
+
+        {/* Profile Button */}
+        <button
+          onClick={() => navigate('/profile')}
+          className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all active:scale-95"
+          style={{ background: 'var(--color-surface-700)', border: '1px solid var(--color-surface-600)' }}
+          aria-label="Profil"
+        >
+          <User size={20} style={{ color: 'var(--color-text-secondary)' }} />
+        </button>
       </div>
 
       {/* ── XP PROGRESS BAR ── */}
@@ -170,62 +165,12 @@ export default function HomePage() {
         </div>
       </button>
 
-      {/* ── FEATURE GRID ── */}
-      <div className="grid grid-cols-2 gap-3">
-        {FEATURE_CARDS.map(({ icon: Icon, label, description, color }, i) => (
-          <div
-            key={label}
-            className="rounded-2xl p-4 flex flex-col gap-3 animate-fade-in-up"
-            style={{
-              background: 'var(--color-surface-800)',
-              border: '1px solid var(--color-surface-600)',
-              animationDelay: `${0.12 + i * 0.05}s`,
-            }}
-          >
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center"
-              style={{ background: `color-mix(in srgb, ${color} 20%, transparent)` }}
-            >
-              <Icon size={18} style={{ color }} />
-            </div>
-            <div>
-              <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-                {label}
-              </p>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                {description}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* ── CALENDAR WIDGET ── */}
+      <WeeklyCalendarWidget />
 
-      {/* ── STREAK MULTIPLIER BADGE ── */}
-      {streak > 0 && (
-        <div
-          className="rounded-2xl p-4 flex items-center gap-4 animate-fade-in-up"
-          style={{
-            background: 'color-mix(in srgb, #f97316 8%, transparent)',
-            border: '1px solid color-mix(in srgb, #f97316 20%, transparent)',
-            animationDelay: '0.3s',
-          }}
-        >
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
-            style={{ background: 'color-mix(in srgb, #f97316 20%, transparent)' }}
-          >
-            🔥
-          </div>
-          <div>
-            <p className="text-sm font-semibold" style={{ color: '#fb923c' }}>
-              {streak >= 4 ? '×2.0 Mnożnik XP!' : streak === 3 ? '×1.5 Mnożnik XP' : streak === 2 ? '×1.2 Mnożnik XP' : 'Streak Aktywny'}
-            </p>
-            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-              {streak} {streak === 1 ? 'tydzień' : streak < 5 ? 'tygodnie' : 'tygodni'} z rzędu — nie przerywaj ciągłości!
-            </p>
-          </div>
-        </div>
-      )}
+      {/* ── RANKS OVERVIEW ── */}
+      <RanksOverviewWidget />
+
     </div>
   )
 }

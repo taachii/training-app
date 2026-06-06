@@ -6,9 +6,9 @@ import { getLevelMeta, MAX_LEVEL } from '@/lib/xpSystem'
 // ─────────────────────────────────────────────
 
 const SIZE_CONFIG = {
-  sm: { svg: 52,  stroke: 4,  iconSize: 16, labelSize: '9px',  gap: 2  },
-  md: { svg: 76,  stroke: 5,  iconSize: 22, labelSize: '10px', gap: 2  },
-  lg: { svg: 104, stroke: 7,  iconSize: 30, labelSize: '12px', gap: 3  },
+  sm: { svg: 52,  stroke: 4,  labelSize: '20px', gap: 2  },
+  md: { svg: 76,  stroke: 5,  labelSize: '28px', gap: 2  },
+  lg: { svg: 104, stroke: 7,  labelSize: '40px', gap: 3  },
 } as const
 
 type BadgeSize = keyof typeof SIZE_CONFIG
@@ -143,28 +143,15 @@ export default function LevelBadge({
           className="absolute inset-0 flex flex-col items-center justify-center select-none"
           style={{ pointerEvents: 'none' }}
         >
-          {/* Tier icon */}
-          <span
-            style={{
-              fontSize: cfg.iconSize,
-              lineHeight: 1,
-              filter: `drop-shadow(0 0 6px ${meta.color})`,
-            }}
-            role="img"
-            aria-label={meta.label}
-          >
-            {meta.icon}
-          </span>
-
           {/* Level number */}
           <span
             style={{
               fontSize: cfg.labelSize,
               fontWeight: 900,
-              lineHeight: 1.1,
+              lineHeight: 1,
               fontFamily: 'var(--font-display)',
               color: '#fff',
-              textShadow: `0 0 8px ${meta.color}`,
+              textShadow: `0 0 12px ${meta.color}`,
               letterSpacing: '-0.02em',
             }}
           >

@@ -1,117 +1,15 @@
 import { useProfileStore, useLevelProgress, useXpForNextLevel } from '@/store/useProfileStore'
-import { getLevelMeta, getStreakMultiplier, STREAK_TIERS, MAX_LEVEL, totalXpForLevel } from '@/lib/xpSystem'
-import { User, Weight, Ruler, ChevronRight, Zap, TrendingUp, Flame } from 'lucide-react'
+import { getLevelMeta, MAX_LEVEL } from '@/lib/xpSystem'
+import { User, Weight, Ruler, ChevronRight, Zap, TrendingUp } from 'lucide-react'
 import LevelBadge from '@/components/ui/LevelBadge'
 
 const GENDER_LABELS = { male: 'Mężczyzna', female: 'Kobieta' }
 
 // ─────────────────────────────────────────────
-// XP ECONOMY CARD
-// ─────────────────────────────────────────────
-
-function XPEconomyCard() {
-  const workoutStreak = useProfileStore((s) => s.profile?.workoutStreak ?? 0)
-  const multiplier = getStreakMultiplier(workoutStreak)
-
-  const rewards = [
-    { label: 'Ukończenie ćwiczenia',     xp: 25,  icon: '💪', note: `×${multiplier}` },
-    { label: 'Udana progresja',          xp: 25,  icon: '📈', note: `×${multiplier}` },
-    { label: 'Rekord życiowy (PR)',       xp: 250, icon: '🏆', note: 'stały'          },
-    { label: 'Brak pominięć w sesji',    xp: 50,  icon: '⚡', note: 'bonus'          },
-  ]
-
-  return (
-    <div
-      className="rounded-2xl overflow-hidden"
-      style={{ background: 'var(--color-surface-800)', border: '1px solid var(--color-surface-600)' }}
-    >
-      <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--color-surface-600)' }}>
-        <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
-          Ekonomia XP
-        </p>
-      </div>
-      {rewards.map(({ label, xp, icon, note }, i) => (
-        <div
-          key={label}
-          className="flex items-center gap-3 px-4 py-3"
-          style={{ borderBottom: i < rewards.length - 1 ? '1px solid var(--color-surface-600)' : 'none' }}
-        >
-          <span className="text-lg w-7 text-center flex-shrink-0">{icon}</span>
-          <span className="flex-1 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-            {label}
-          </span>
-          <div className="flex items-center gap-1.5">
-            <span
-              className="text-sm font-bold"
-              style={{ color: '#818cf8' }}
-            >
-              +{xp}
-            </span>
-            <span className="text-xs px-1.5 py-0.5 rounded-md" style={{ background: 'var(--color-surface-600)', color: 'var(--color-text-muted)' }}>
-              {note}
-            </span>
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────
-// STREAK MULTIPLIER CARD
-// ─────────────────────────────────────────────
-
-function StreakCard({ streak }: { streak: number }) {
-  return (
-    <div
-      className="rounded-2xl overflow-hidden"
-      style={{ background: 'var(--color-surface-800)', border: '1px solid var(--color-surface-600)' }}
-    >
-      <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--color-surface-600)' }}>
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
-            Mnożnik Streaka
-          </p>
-          <span className="text-lg">🔥</span>
-        </div>
-      </div>
-      <div className="flex gap-0">
-        {STREAK_TIERS.slice(0, 4).reverse().map(({ weeks, multiplier, label }, i, arr) => {
-          const isActive = streak >= weeks
-          const isCurrent = streak >= weeks && (i === arr.length - 1 || streak < arr[i + 1]?.weeks)
-          return (
-            <div
-              key={weeks}
-              className="flex-1 flex flex-col items-center py-3 gap-1"
-              style={{
-                borderRight: i < arr.length - 1 ? '1px solid var(--color-surface-600)' : 'none',
-                background: isCurrent
-                  ? 'color-mix(in srgb, #f97316 12%, transparent)'
-                  : 'transparent',
-              }}
-            >
-              <span
-                className="text-sm font-bold"
-                style={{ color: isActive ? '#fb923c' : 'var(--color-text-muted)', opacity: isActive ? 1 : 0.5 }}
-              >
-                {label}
-              </span>
-              <span className="text-xs" style={{ color: 'var(--color-text-muted)', opacity: isActive ? 1 : 0.4 }}>
-                {weeks}wk
-              </span>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────
 // LEVEL PROGRESS DETAIL
 // ─────────────────────────────────────────────
 
-function LevelProgressCard({ level, xp, totalXp }: { level: number; xp: number; totalXp: number }) {
+function LevelProgressCard({ level, xp }: { level: number; xp: number }) {
   const lvlProgress = useLevelProgress()
   const xpForNext = useXpForNextLevel()
   const meta = getLevelMeta(level)
@@ -156,21 +54,9 @@ function LevelProgressCard({ level, xp, totalXp }: { level: number; xp: number; 
               }}
             />
           </div>
-          <div className="flex justify-between text-xs mt-1" style={{ color: meta.ringColor }}>
-            <span>{xp} XP w tym poziomie</span>
+          <div className="flex justify-end text-xs mt-1" style={{ color: meta.ringColor }}>
             {!isMax && <span>do Lv.{level + 1}: {xpForNext - xp} XP</span>}
           </div>
-        </div>
-
-        {/* Total XP */}
-        <div
-          className="flex items-center justify-between px-3 py-2 rounded-xl"
-          style={{ background: 'var(--color-surface-700)' }}
-        >
-          <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>Łączne XP</span>
-          <span className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>
-            {totalXp.toLocaleString()} / {isMax ? totalXp.toLocaleString() : totalXpForLevel(MAX_LEVEL).toLocaleString()}
-          </span>
         </div>
 
         {/* Hard cap note */}
@@ -203,7 +89,6 @@ export default function ProfilePage() {
   const level   = profile?.level ?? 1
   const xp      = profile?.xp ?? 0
   const totalXp = profile?.totalXp ?? 0
-  const streak  = profile?.workoutStreak ?? 0
   const xpForNext = useXpForNextLevel()
   const meta    = getLevelMeta(level)
 
@@ -251,7 +136,6 @@ export default function ProfilePage() {
         <div className="flex gap-3 w-full">
           {[
             { label: 'Poziom',   value: level,             Icon: Zap,        color: meta.ringColor },
-            { label: 'Streak',   value: `${streak}wk`,     Icon: Flame,      color: '#fb923c'      },
             { label: 'Total XP', value: totalXp.toLocaleString(), Icon: TrendingUp, color: '#34d399' },
           ].map(({ label, value, Icon, color }) => (
             <div
@@ -271,17 +155,7 @@ export default function ProfilePage() {
 
       {/* ── LEVEL PROGRESS ── */}
       <div className="animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
-        <LevelProgressCard level={level} xp={xp} totalXp={totalXp} />
-      </div>
-
-      {/* ── STREAK MULTIPLIER ── */}
-      <div className="animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-        <StreakCard streak={streak} />
-      </div>
-
-      {/* ── XP ECONOMY ── */}
-      <div className="animate-fade-in-up" style={{ animationDelay: '0.15s' }}>
-        <XPEconomyCard />
+        <LevelProgressCard level={level} xp={xp} />
       </div>
 
       {/* ── PHYSICAL DATA ── */}

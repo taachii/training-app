@@ -43,17 +43,6 @@ export interface UserProfile {
   /** XP within the current level (= totalXp − totalXpForLevel(level)) */
   xp: number
 
-  /**
-   * Consecutive training weeks.
-   * Increments when you train in a new calendar ISO week.
-   * Resets to 1 if more than 7 days pass without any workout.
-   * Affects XP streak multiplier (×1.0 → ×2.0).
-   */
-  workoutStreak: number
-
-  /** ISO date string of the last recorded workout (YYYY-MM-DD) */
-  lastWorkoutDate: string | null
-
   createdAt: string
   updatedAt: string
 }

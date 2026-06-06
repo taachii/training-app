@@ -26,7 +26,7 @@ export const MAX_LEVEL = 50
 export const MAX_TOTAL_XP = 25 * (MAX_LEVEL * MAX_LEVEL + MAX_LEVEL - 2) // 63 700
 
 // ─────────────────────────────────────────────
-// XP REWARDS  (before streak multiplier)
+// XP REWARDS
 // ─────────────────────────────────────────────
 
 export const XP_REWARDS = {
@@ -42,32 +42,6 @@ export const XP_REWARDS = {
   /** Awarded at session end if ZERO exercises were skipped */
   FULL_SESSION_BONUS: 50,
 } as const
-
-// ─────────────────────────────────────────────
-// STREAK MULTIPLIER
-// ─────────────────────────────────────────────
-
-/**
- * Returns the XP multiplier based on consecutive training weeks.
- *  0–1 weeks → x1.0
- *  2 weeks   → x1.2
- *  3 weeks   → x1.5
- *  4+ weeks  → x2.0 (cap)
- */
-export function getStreakMultiplier(streakWeeks: number): number {
-  if (streakWeeks >= 4) return 2.0
-  if (streakWeeks === 3) return 1.5
-  if (streakWeeks === 2) return 1.2
-  return 1.0
-}
-
-export const STREAK_TIERS = [
-  { weeks: 4, multiplier: 2.0, label: '×2.0 🔥' },
-  { weeks: 3, multiplier: 1.5, label: '×1.5 ⚡' },
-  { weeks: 2, multiplier: 1.2, label: '×1.2 💪' },
-  { weeks: 1, multiplier: 1.0, label: '×1.0'   },
-  { weeks: 0, multiplier: 1.0, label: '×1.0'   },
-]
 
 // ─────────────────────────────────────────────
 // LEVEL CALCULATIONS
@@ -130,85 +104,28 @@ export function levelFromTotalXp(totalXp: number): {
 
 /**
  * Compute total XP to award for a single completed exercise.
- * Streak multiplier is applied to BASE + PROGRESSION only (not PR bonus —
- * PR should feel massive regardless of streak).
  */
 export function computeExerciseXP(params: {
   isSuccessfulProgression: boolean
   isPersonalRecord: boolean
-  streakWeeks: number
 }): { total: number; breakdown: Record<string, number> } {
-  const multiplier = getStreakMultiplier(params.streakWeeks)
-
   const base       = XP_REWARDS.BASE_COMPLETION
   const progression = params.isSuccessfulProgression ? XP_REWARDS.SUCCESSFUL_PROGRESSION : 0
   const prBonus    = params.isPersonalRecord ? XP_REWARDS.PERSONAL_RECORD : 0
 
-  // Streak multiplier applies to base + progression, PR is always full value
-  const multiplied = Math.floor((base + progression) * multiplier)
-  const total = multiplied + prBonus
+  const total = base + progression + prBonus
 
   return {
     total,
     breakdown: {
-      base: Math.floor(base * multiplier),
-      progression: Math.floor(progression * multiplier),
+      base: base,
+      progression: progression,
       pr: prBonus,
     },
   }
 }
 
 // ─────────────────────────────────────────────
-// ISO WEEK KEY (for streak tracking)
-// ─────────────────────────────────────────────
-
-/**
- * Returns an ISO week key "YYYY-WNN" for a given date.
- * Used to determine whether two workouts fall in the same calendar week.
- */
-export function getIsoWeekKey(date: Date): string {
-  // Copy date and find Thursday of the same week (ISO week definition)
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
-  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7))
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
-  const weekNum = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7)
-  return `${d.getUTCFullYear()}-W${String(weekNum).padStart(2, '0')}`
-}
-
-/**
- * Determine the new streak value after recording a workout.
- * Returns { newStreak, wasReset }
- */
-export function computeNewStreak(
-  currentStreak: number,
-  lastWorkoutDate: string | null,
-  today: Date = new Date(),
-): { newStreak: number; wasReset: boolean } {
-  if (!lastWorkoutDate) {
-    return { newStreak: 1, wasReset: false }
-  }
-
-  const last = new Date(lastWorkoutDate)
-  const daysSinceLast = Math.floor(
-    (today.getTime() - last.getTime()) / (1000 * 60 * 60 * 24),
-  )
-
-  if (daysSinceLast > 7) {
-    // More than 7 days gap → reset streak
-    return { newStreak: 1, wasReset: true }
-  }
-
-  const lastWeek = getIsoWeekKey(last)
-  const thisWeek = getIsoWeekKey(today)
-
-  if (lastWeek === thisWeek) {
-    // Same week — streak unchanged
-    return { newStreak: currentStreak, wasReset: false }
-  }
-
-  // New consecutive week — increment
-  return { newStreak: currentStreak + 1, wasReset: false }
-}
 
 // ─────────────────────────────────────────────
 // LEVEL BADGE METADATA

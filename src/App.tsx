@@ -1,7 +1,8 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import AppLayout    from '@/components/layout/AppLayout'
 import HomePage     from '@/pages/HomePage'
-import CalendarPage from '@/pages/CalendarPage'
+import RankingsPage from '@/pages/RankingsPage'
+import FriendsPage  from '@/pages/FriendsPage'
 import PlansPage    from '@/pages/PlansPage'
 import PlanFormPage from '@/pages/PlanFormPage'
 import SessionPage  from '@/pages/SessionPage'
@@ -15,7 +16,8 @@ export default function App() {
         {/* Pages with BottomNav */}
         <Route element={<AppLayout />}>
           <Route path="/"         element={<HomePage />}     />
-          <Route path="/calendar" element={<CalendarPage />} />
+          <Route path="/rankings" element={<RankingsPage />} />
+          <Route path="/friends"  element={<FriendsPage />}  />
           <Route path="/plans"    element={<PlansPage />}    />
           <Route path="/stats"    element={<StatsPage />}    />
           <Route path="/profile"  element={<ProfilePage />}  />

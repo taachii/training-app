@@ -14,7 +14,7 @@ import type { WorkoutPlan, LoggedSet, WorkoutLog, LoggedExercise } from '@/types
 import type { Exercise } from '@/types/exercise'
 import type { ActiveSession, SessionExercise, SessionPhase } from '@/types/session'
 import { calculateEpley1RM } from '@/features/ranks/wilksCalculator'
-import { computeExerciseXP, getStreakMultiplier, XP_REWARDS } from '@/lib/xpSystem'
+import { computeExerciseXP, XP_REWARDS } from '@/lib/xpSystem'
 import { useLogStore, calculateProgressionSuggestion } from '@/store/useLogStore'
 
 // ─────────────────────────────────────────────
@@ -137,7 +137,6 @@ interface SessionState {
    */
   finishSession: (
     isEarly: boolean,
-    streakWeeks: number,
   ) => WorkoutLog
 
   /**
@@ -235,11 +234,10 @@ export const useSessionStore = create<SessionState>()(
       const prevBest  = previousPR ?? 0
       isPersonalRecord = epley1RM > prevBest && ex.useWilksRank
 
-      // XP computation (streak multiplier applied at finalize time — here we track raw)
+      // XP computation
       const raw = computeExerciseXP({
         isSuccessfulProgression: allSuccess,
         isPersonalRecord,
-        streakWeeks: 0, // applied at finalize
       })
 
       xpAwarded = raw.total
@@ -378,7 +376,7 @@ export const useSessionStore = create<SessionState>()(
 
   // ── finishSession ──────────────────────────────────────────────────────
 
-  finishSession: (isEarly, streakWeeks) => {
+  finishSession: (isEarly) => {
     const { session } = get()
     if (!session) throw new Error('No active session')
 
@@ -387,21 +385,18 @@ export const useSessionStore = create<SessionState>()(
     const endMs   = new Date(endTime).getTime()
     const durationSeconds = Math.round((endMs - startMs) / 1000)
 
-    const multiplier = getStreakMultiplier(streakWeeks)
-
     // Mark all remaining pending exercises as skipped
     const exercises = session.exercises.map((ex) =>
       ex.status === 'pending' ? { ...ex, status: 'skipped' as const, xpEarned: 0 } : ex,
     )
 
-    // Compute final XP with streak multiplier
+    // Compute final XP
     const baseXP = exercises.reduce((sum, ex) => sum + (ex.xpEarned ?? 0), 0)
-    const multipliedXP = Math.floor(baseXP * multiplier)
 
     const hasSkips = exercises.some((ex) => ex.status === 'skipped')
     const fullCompletion = !hasSkips
 
-    let totalXpEarned = multipliedXP
+    let totalXpEarned = baseXP
     if (fullCompletion) totalXpEarned += XP_REWARDS.FULL_SESSION_BONUS
 
     // Build LoggedExercise array

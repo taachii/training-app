@@ -6,7 +6,6 @@ import {
   totalXpForLevel,
   MAX_LEVEL,
   MAX_TOTAL_XP,
-  computeNewStreak,
 } from '@/lib/xpSystem'
 
 // ─────────────────────────────────────────────
@@ -16,7 +15,7 @@ import {
 function makeDefaultProfile(overrides: Partial<UserProfile> = {}): UserProfile {
   return {
     id: 'local-user',
-    name: 'Atleta',
+    name: 'taachii',
     gender: 'male',
     weight: 80,
     weightHistory: [],
@@ -24,8 +23,6 @@ function makeDefaultProfile(overrides: Partial<UserProfile> = {}): UserProfile {
     totalXp: 0,
     level: 1,
     xp: 0,
-    workoutStreak: 0,
-    lastWorkoutDate: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     ...overrides,
@@ -37,7 +34,7 @@ function makeDefaultProfile(overrides: Partial<UserProfile> = {}): UserProfile {
 // ─────────────────────────────────────────────
 
 export interface XPGainResult {
-  /** Final XP awarded (after streak multiplier) */
+  /** Final XP awarded */
   xpGained: number
   /** Whether the player crossed a level threshold */
   leveledUp: boolean
@@ -61,19 +58,9 @@ interface ProfileState {
   // ── XP & Levelling ───────────────────────────────────────────────────
   /**
    * Add XP to the profile.
-   * The caller passes the RAW amount (before streak multiplier).
-   * If streakMultiplier is provided, it will be applied internally.
    * Returns an XPGainResult describing what happened.
    */
-  addXP: (rawAmount: number, streakMultiplier?: number) => XPGainResult
-
-  // ── Workout streak ───────────────────────────────────────────────────
-  /**
-   * Call this at the START of each workout session (not end).
-   * Updates workoutStreak and lastWorkoutDate.
-   * Returns { wasReset } so the UI can show a streak-lost message.
-   */
-  recordWorkout: () => { wasReset: boolean; newStreak: number }
+  addXP: (rawAmount: number) => XPGainResult
 }
 
 // ─────────────────────────────────────────────
@@ -119,14 +106,14 @@ export const useProfileStore = create<ProfileState>()(
 
       // ── XP & Levelling ───────────────────────────────────────────────
 
-      addXP: (rawAmount, streakMultiplier = 1) => {
+      addXP: (rawAmount) => {
         const profile = get().profile
         if (!profile) {
           return { xpGained: 0, leveledUp: false, newLevel: 1, oldLevel: 1, cappedAtMax: false }
         }
 
         const oldLevel = profile.level
-        const finalXp  = Math.floor(rawAmount * streakMultiplier)
+        const finalXp = rawAmount
 
         // Clamp to hard cap
         const newTotalXp = Math.min(profile.totalXp + finalXp, MAX_TOTAL_XP)
@@ -140,48 +127,20 @@ export const useProfileStore = create<ProfileState>()(
             profile: {
               ...s.profile,
               totalXp: newTotalXp,
-              level:   Math.min(newLevel, MAX_LEVEL),
-              xp:      currentLevelXp,
+              level: Math.min(newLevel, MAX_LEVEL),
+              xp: currentLevelXp,
               updatedAt: new Date().toISOString(),
             },
           }
         })
 
         return {
-          xpGained:    finalXp,
-          leveledUp:   newLevel > oldLevel,
-          newLevel:    Math.min(newLevel, MAX_LEVEL),
+          xpGained: finalXp,
+          leveledUp: newLevel > oldLevel,
+          newLevel: Math.min(newLevel, MAX_LEVEL),
           oldLevel,
           cappedAtMax,
         }
-      },
-
-      // ── Workout streak ───────────────────────────────────────────────
-
-      recordWorkout: () => {
-        const profile = get().profile ?? makeDefaultProfile()
-        const today = new Date()
-        const todayStr = today.toISOString().slice(0, 10)
-
-        const { newStreak, wasReset } = computeNewStreak(
-          profile.workoutStreak,
-          profile.lastWorkoutDate,
-          today,
-        )
-
-        set((s) => {
-          const base = s.profile ?? makeDefaultProfile()
-          return {
-            profile: {
-              ...base,
-              workoutStreak:   newStreak,
-              lastWorkoutDate: todayStr,
-              updatedAt:       today.toISOString(),
-            },
-          }
-        })
-
-        return { wasReset, newStreak }
       },
     }),
     { name: 'training-app-profile' },
@@ -208,7 +167,7 @@ export function useLevelProgress(): number {
     const { totalXp, level } = s.profile
     if (level >= MAX_LEVEL) return 1
     const levelStart = totalXpForLevel(level)
-    const levelEnd   = totalXpForLevel(level + 1)
+    const levelEnd = totalXpForLevel(level + 1)
     return Math.min(1, (totalXp - levelStart) / (levelEnd - levelStart))
   })
 }

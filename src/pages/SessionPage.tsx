@@ -579,7 +579,7 @@ function DoneScreen({ planName, log, onClose }: DoneScreenProps) {
 
       {skippedCount > 0 && (
         <p className="text-xs text-center" style={{ color: 'rgba(255,255,255,0.4)' }}>
-          💡 {skippedCount} {skippedCount === 1 ? 'ćwiczenie pominięte' : 'ćwiczenia pominięte'} — streak zachowany!
+          💡 {skippedCount} {skippedCount === 1 ? 'ćwiczenie pominięte' : 'ćwiczenia pominięte'}
         </p>
       )}
 
@@ -814,16 +814,15 @@ export default function SessionPage() {
 
   const { plans, exercises } = useWorkoutStore()
   const { addLog, updateProgressionAfterSession, updatePersonalRecord, personalRecords } = useLogStore()
-  const { profile, addXP, recordWorkout } = useProfileStore()
+  const { addXP } = useProfileStore()
 
   useEffect(() => {
     if (isDone && !finalLog && session) {
-      const streak = profile?.workoutStreak ?? 0
       const isEarly = session.phase === 'done_early'
-      const log = finishSession(isEarly, streak)
+      const log = finishSession(isEarly)
       setFinalLog(log)
     }
-  }, [isDone, finalLog, profile?.workoutStreak, session, finishSession])
+  }, [isDone, finalLog, session, finishSession])
 
   // ── Elapsed timer ──
   const [elapsedSec, setElapsedSec] = useState(0)
@@ -877,9 +876,10 @@ export default function SessionPage() {
     // Already running the same session — do not restart
     if (session && session.workoutPlanId === planId) return
 
-    startSession(plan, exercises)
-    setElapsedSec(0)
-    recordWorkout()
+    if (plan && exercises.length > 0) {
+      startSession(plan, exercises)
+      setElapsedSec(0)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planId, plans.length])
 
@@ -933,9 +933,9 @@ export default function SessionPage() {
 
     const result = logCurrentSet(index, ex.inputWeight, ex.inputReps, prevPR)
 
-    // Award XP immediately (streak applied)
+    // Award XP immediately
     if (result.xpAwarded > 0) {
-      addXP(result.xpAwarded, 1) // multiplier already baked in; applied at finalize
+      addXP(result.xpAwarded)
     }
 
     // Update PR
@@ -1025,7 +1025,7 @@ export default function SessionPage() {
       }
     }
 
-    addXP(finalLog.totalXpEarned, 1)
+    addXP(finalLog.totalXpEarned)
     clearSession()
     localStorage.removeItem('restExpiresAt')
     localStorage.removeItem('restTotal')
