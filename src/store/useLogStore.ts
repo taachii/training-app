@@ -4,6 +4,7 @@ import type { WorkoutLog, LoggedExercise } from '@/types/workout'
 import type { PersonalRecord } from '@/types/ranks'
 import type { ProgressionState } from '@/types/progression'
 import { PROGRESSION_DEFAULTS } from '@/types/progression'
+import { useWorkoutStore } from '@/store/useWorkoutStore'
 
 // ─────────────────────────────────────────────
 // HELPERS — derive effective weight from actual log
@@ -28,6 +29,50 @@ function deriveEffectiveWeight(logged: LoggedExercise): number {
  */
 function roundWeight(kg: number): number {
   return Math.round(kg * 4) / 4
+}
+
+/**
+ * Calculates the new suggested weight/reps and updated fail count.
+ */
+export function calculateProgressionSuggestion(
+  logged: LoggedExercise,
+  prevFails: number,
+  type: 'weight' | 'reps' | 'none' = 'weight',
+  step?: number
+): { nextWeight: number; nextReps: number; consecutiveFails: number } {
+  const effectiveWeight = deriveEffectiveWeight(logged)
+  const effectiveReps = logged.plannedReps
+
+  let nextWeight = effectiveWeight
+  let nextReps = effectiveReps
+  let consecutiveFails = prevFails
+
+  if (type === 'none') {
+    return { nextWeight, nextReps, consecutiveFails }
+  }
+
+  const actualStep = step ?? (type === 'reps' ? 1 : 2.5)
+
+  if (logged.success) {
+    // ✅ SUCCESS
+    if (type === 'weight') nextWeight = roundWeight(effectiveWeight + actualStep)
+    if (type === 'reps') nextReps = effectiveReps + actualStep
+    consecutiveFails = 0
+  } else {
+    consecutiveFails += 1
+
+    if (consecutiveFails >= PROGRESSION_DEFAULTS.deloadTrigger) {
+      // ❌❌ DELOAD
+      if (type === 'weight') {
+        nextWeight = roundWeight(Math.max(0, effectiveWeight - actualStep))
+      } else if (type === 'reps') {
+        nextReps = Math.max(1, effectiveReps - 1) // always -1 rep on deload
+      }
+      consecutiveFails = 0
+    }
+  }
+
+  return { nextWeight, nextReps, consecutiveFails }
 }
 
 // ─────────────────────────────────────────────
@@ -73,39 +118,26 @@ export const useLogStore = create<LogState>()(
 
       updateProgressionAfterSession: (logged) =>
         set((s) => {
-          const effectiveWeight = deriveEffectiveWeight(logged)
           const exerciseId = logged.exerciseId
-
           const prev = s.progressionStates[exerciseId] ?? {
             exerciseId,
-            currentWeight: effectiveWeight,
+            currentWeight: deriveEffectiveWeight(logged),
             consecutiveFails: 0,
             lastUpdated: new Date().toISOString(),
           }
 
-          let nextWeight: number
-          let consecutiveFails: number
-
+          let consecutiveFails = prev.consecutiveFails
           if (logged.success) {
-            // ✅ SUCCESS: bump weight, reset fail counter
-            nextWeight = roundWeight(effectiveWeight + PROGRESSION_DEFAULTS.successIncrement)
             consecutiveFails = 0
           } else {
-            consecutiveFails = prev.consecutiveFails + 1
-
+            consecutiveFails += 1
             if (consecutiveFails >= PROGRESSION_DEFAULTS.deloadTrigger) {
-              // ❌❌ DELOAD: 2nd consecutive fail → -10%, reset counter
-              nextWeight = roundWeight(effectiveWeight * (1 - PROGRESSION_DEFAULTS.deloadFraction))
               consecutiveFails = 0
-            } else {
-              // ❌ 1st fail: keep the same weight, no change
-              nextWeight = effectiveWeight
             }
           }
 
           const updated: ProgressionState = {
-            exerciseId,
-            currentWeight: nextWeight,
+            ...prev,
             consecutiveFails,
             lastUpdated: new Date().toISOString(),
           }

@@ -121,15 +121,22 @@ export default function PlanExerciseRow({
   onMoveUp,
   onMoveDown,
 }: PlanExerciseRowProps) {
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(false)
   const { exercise } = data
   const primaryMeta = MUSCLE_GROUP_META[exercise.primaryMuscleGroup]
   const isBodyweight = exercise.category === 'bodyweight'
+  
+  const isPureBodyweight = isBodyweight && !['weighted_pull_up', 'weighted_chin_up', 'weighted_dip'].includes(exercise.id)
+
+  const defaultProgType = isPureBodyweight ? 'reps' : 'weight'
+  const progType = data.progressionType ?? defaultProgType
+  const defaultProgStep = progType === 'reps' ? 1 : 2.5
+  const progStep = data.progressionStep ?? defaultProgStep
 
   const update = (patch: Partial<PlanExercise>) =>
     onChange({ ...data, ...patch })
 
-  const summaryLabel = isBodyweight
+  const summaryLabel = isPureBodyweight
     ? `${data.sets}×${data.reps}`
     : `${data.sets}×${data.reps} @ ${data.weight}kg`
 
@@ -199,22 +206,89 @@ export default function PlanExerciseRow({
               min={1}
               max={100}
             />
-            {!isBodyweight && (
-              <Stepper
-                label="Ciężar"
-                unit="kg"
-                value={data.weight}
-                onChange={(v) => update({ weight: v })}
-                min={0}
-                max={500}
-                step={2.5}
-                decimals={1}
-              />
+            {!isPureBodyweight && (
+              <div className="flex flex-col items-center gap-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+                  Ciężar
+                </p>
+                <div className="relative flex items-center">
+                  <input
+                    type="number"
+                    min={0}
+                    max={999}
+                    step={0.25}
+                    value={data.weight === 0 ? '' : data.weight}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      if (val === '') {
+                        update({ weight: 0 })
+                        return
+                      }
+                      update({ weight: parseFloat(val) || 0 })
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.currentTarget.blur()
+                      }
+                    }}
+                    className="h-8 w-20 rounded-xl text-center text-sm font-bold outline-none"
+                    style={{
+                      background: 'var(--color-surface-700)',
+                      color: 'var(--color-text-primary)',
+                      paddingRight: '18px',
+                    }}
+                    placeholder="0"
+                  />
+                  <span
+                    className="absolute right-2.5 text-[10px] font-semibold pointer-events-none"
+                    style={{ color: 'var(--color-text-muted)' }}
+                  >
+                    kg
+                  </span>
+                </div>
+              </div>
             )}
           </div>
 
           {/* Rest selector */}
           <RestSelector value={data.restSeconds} onChange={(v) => update({ restSeconds: v })} />
+
+          {/* Progression Overload UI */}
+          <div className="flex flex-col gap-1.5 pt-3" style={{ borderTop: '1px solid var(--color-surface-600)' }}>
+            <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+              Progresja
+            </p>
+            <div className="flex items-center gap-4">
+              <select
+                value={progType}
+                onChange={(e) => update({ progressionType: e.target.value as any })}
+                className="h-8 px-2 rounded-xl text-sm font-medium outline-none cursor-pointer"
+                style={{ background: 'var(--color-surface-700)', color: 'var(--color-text-primary)' }}
+              >
+                <option value="weight">Ciężar</option>
+                <option value="reps">Powtórzenia</option>
+                <option value="none">Brak</option>
+              </select>
+              
+              {progType !== 'none' && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Krok:</span>
+                  <input
+                    type="number"
+                    min={0.1}
+                    step={progType === 'reps' ? 1 : 0.25}
+                    value={progStep}
+                    onChange={(e) => update({ progressionStep: parseFloat(e.target.value) || 0 })}
+                    className="h-8 w-16 rounded-xl text-center text-sm font-bold outline-none"
+                    style={{ background: 'var(--color-surface-700)', color: 'var(--color-text-primary)' }}
+                  />
+                  <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                    {progType === 'weight' ? 'kg' : 'powt.'}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Action buttons */}
           <div className="flex items-center gap-2 pt-1">

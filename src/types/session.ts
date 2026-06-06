@@ -1,4 +1,5 @@
 import type { PlanExercise, LoggedSet } from './workout'
+import type { ExerciseCategory, MuscleGroup } from './exercise'
 
 // ─────────────────────────────────────────────
 // SESSION EXERCISE STATUS
@@ -8,70 +9,99 @@ import type { PlanExercise, LoggedSet } from './workout'
  * Lifecycle of a single exercise within an active session:
  *
  *  pending → active → completed
- *                  ↘ skipped   (user tapped "Pomiń")
- *
- * All unstarted exercises become 'skipped' when the user hits
- * "Zakończ trening wcześniej" (early finish).
+ *                  ↘ skipped   (user tapped "Pomiń" OR session ended early)
  */
 export type ExerciseStatus = 'pending' | 'active' | 'completed' | 'skipped'
 
 // ─────────────────────────────────────────────
-// ACTIVE SESSION STATE
+// SESSION PHASE
 // ─────────────────────────────────────────────
 
-export type SessionStatus =
-  | 'idle'
-  | 'active'               // user is performing a set
-  | 'resting'              // timer counting down between sets
-  | 'resting_exercise'     // timer between exercises
-  | 'done'                 // session finished normally
-  | 'done_early'           // session ended early by user
+export type SessionPhase =
+  | 'working'           // user is entering set data
+  | 'resting'           // timer counting down between sets
+  | 'resting_last'      // timer after LAST set of exercise (shows next exercise preview)
+  | 'done'              // session completed normally
+  | 'done_early'        // session ended early by user
+
+// ─────────────────────────────────────────────
+// SESSION EXERCISE
+// ─────────────────────────────────────────────
 
 export interface SessionExercise extends PlanExercise {
+  // ── Resolved exercise metadata ─────────────────────────────────────────
   exerciseName: string
+  exerciseCategory: ExerciseCategory
+  primaryMuscleGroup: MuscleGroup
+  useWilksRank: boolean
+  exerciseNotes?: string
 
+  // ── Live session state ─────────────────────────────────────────────────
   status: ExerciseStatus
 
-  /** Current set being performed (1-indexed) */
+  /** 0-indexed: which set the user is currently performing */
   currentSetIndex: number
 
   /**
-   * Sets logged so far.
-   * IMPORTANT: these are the ACTUAL values the user typed/adjusted inline —
-   * they may differ from the plan targets. The progression algorithm
-   * reads from here, not from plan targets.
+   * Inline-editable inputs for the current set being performed.
+   * These start at the planned weight/reps (or progression suggestion)
+   * and the user can modify them freely before logging.
    */
-  completedSets: LoggedSet[]
+  inputWeight: number
+  inputReps: number
 
   /**
-   * User-marked success: "Udało się!" checkbox.
-   * true  → full progression reward (+2.5 kg next time, +25 XP progression bonus)
-   * false → partial / failed (counts toward deload counter)
-   * undefined → not yet decided (exercise still in progress)
+   * All sets logged so far for this exercise.
+   * IMPORTANT: These are the ACTUAL values — the progression algorithm reads
+   * from here, not from the plan targets.
+   */
+  loggedSets: LoggedSet[]
+
+  /**
+   * Overall exercise success:
+   * true  = ALL logged sets had isSuccess === true
+   * false = at least one set failed (→ counts toward deload counter)
+   * undefined = exercise not yet completed
    */
   success?: boolean
 
-  /** XP earned from this exercise (awarded dynamically when logged) */
+  /** XP earned from this exercise (awarded when exercise is completed) */
   xpEarned: number
 
-  /** Whether a new personal record was set during this exercise */
+  /** Whether a new personal 1RM record was set during this exercise */
   isPersonalRecord: boolean
 }
+
+// ─────────────────────────────────────────────
+// ACTIVE SESSION
+// ─────────────────────────────────────────────
 
 export interface ActiveSession {
   id: string
   workoutPlanId: string
+  planName: string
   scheduledWorkoutId?: string
-  status: SessionStatus
+
+  phase: SessionPhase
+
   exercises: SessionExercise[]
-  /** Index into exercises array */
+
+  /** Index of the exercise currently being performed */
   currentExerciseIndex: number
-  /** Seconds remaining on the rest timer */
-  restSecondsRemaining: number
-  /** ISO timestamp */
-  startTime: string
-  /** ISO timestamp — set when done */
-  endTime?: string
-  /** Total XP accumulated so far in this session */
+
+  /**
+   * The index the user is VIEWING in the carousel.
+   * May differ from currentExerciseIndex when user swipes back to review
+   * a previous exercise.
+   */
+  viewIndex: number
+
+  /** Total XP earned so far in this session */
   totalXpThisSession: number
+
+  /** ISO timestamp of when the session started */
+  startTime: string
+
+  /** ISO timestamp set when session ends */
+  endTime?: string
 }

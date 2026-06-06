@@ -1,5 +1,8 @@
-import { Dumbbell, TrendingUp, Trophy, Zap } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Dumbbell, TrendingUp, Trophy, Zap, Clock } from 'lucide-react'
 import { useProfileStore, useLevelProgress, useXpForNextLevel } from '@/store/useProfileStore'
+import { useSessionStore } from '@/store/useSessionStore'
 import LevelBadge from '@/components/ui/LevelBadge'
 import { getLevelMeta } from '@/lib/xpSystem'
 
@@ -19,6 +22,32 @@ export default function HomePage() {
   const xpForNext  = useXpForNextLevel()
   const lvlProgress = useLevelProgress()
   const levelMeta  = getLevelMeta(level)
+  const navigate   = useNavigate()
+  const { session } = useSessionStore()
+
+  const [elapsedSec, setElapsedSec] = useState(0)
+
+  useEffect(() => {
+    if (!session || session.phase === 'done' || session.phase === 'done_early') return
+    if (!session.startTime) return
+
+    const tick = () => {
+      const diff = Math.floor((Date.now() - new Date(session.startTime).getTime()) / 1000)
+      setElapsedSec(diff >= 0 ? diff : 0)
+    }
+
+    tick() // initial set
+    const interval = setInterval(tick, 1000)
+    return () => clearInterval(interval)
+  }, [session?.startTime, session?.phase])
+
+  const formatTime = (sec: number) => {
+    const m = Math.floor(sec / 60)
+    const s = sec % 60
+    return `${m}:${String(s).padStart(2, '0')}`
+  }
+
+  const hasActiveSession = session && session.phase !== 'done' && session.phase !== 'done_early'
 
   return (
     <div className="flex flex-col px-4 pt-8 pb-4 gap-6 relative">
@@ -110,8 +139,9 @@ export default function HomePage() {
       </div>
 
       {/* ── QUICK START CTA ── */}
-      <div
-        className="relative overflow-hidden rounded-2xl p-5 animate-fade-in-up"
+      <button
+        onClick={() => hasActiveSession ? navigate(`/session/start/${session.workoutPlanId}`) : navigate('/plans')}
+        className="w-full relative overflow-hidden rounded-2xl p-5 flex flex-col items-start animate-fade-in-up text-left transition-all duration-200 active:scale-[0.98]"
         style={{
           background: 'linear-gradient(135deg, #4338ca, #7c3aed)',
           boxShadow: '0 8px 32px color-mix(in srgb, #6366f1 35%, transparent)',
@@ -122,19 +152,23 @@ export default function HomePage() {
           className="absolute -top-6 -right-6 w-28 h-28 rounded-full opacity-20"
           style={{ background: '#fff' }}
         />
-        <p className="text-xs font-semibold uppercase tracking-widest mb-1 opacity-80" style={{ color: '#c4b5fd' }}>
-          Dzisiejszy trening
-        </p>
-        <p className="text-lg font-bold text-white mb-4">Nie masz zaplanowanego treningu</p>
-        <button
-          className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-200 active:scale-95"
-          style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', backdropFilter: 'blur(8px)' }}
-          aria-label="Zaplanuj trening"
-        >
-          <Dumbbell size={16} />
-          Zaplanuj trening
-        </button>
-      </div>
+        <div className="relative z-10 w-full flex items-center justify-between mb-1">
+          <p className="text-xs font-semibold uppercase tracking-widest opacity-80" style={{ color: '#c4b5fd' }}>
+            {hasActiveSession ? 'Aktywna sesja' : 'Brak aktywnej sesji'}
+          </p>
+        </div>
+        <div className="relative z-10 flex items-center gap-3 w-full">
+          <p className="text-xl font-bold text-white">
+            {hasActiveSession ? 'Trening w toku' : 'Rozpocznij trening'}
+          </p>
+          {hasActiveSession && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={{ background: 'rgba(0,0,0,0.2)' }}>
+              <Clock size={14} color="#c4b5fd" />
+              <span className="text-sm font-bold text-white tracking-widest">{formatTime(elapsedSec)}</span>
+            </div>
+          )}
+        </div>
+      </button>
 
       {/* ── FEATURE GRID ── */}
       <div className="grid grid-cols-2 gap-3">

@@ -2,6 +2,8 @@
 // WORKOUT PLAN (Blueprint)
 // ─────────────────────────────────────────────
 
+export type ProgressionType = 'weight' | 'reps' | 'none'
+
 export interface PlanExercise {
   /** References Exercise.id */
   exerciseId: string
@@ -10,10 +12,13 @@ export interface PlanExercise {
   reps: number
   /** kg; undefined/0 for bodyweight */
   weight: number
-  /** Rest after all sets (seconds) */
+  /** Rest time between sets (seconds), configured in blueprint editor */
   restSeconds: number
-  /** Rest between sets (seconds) — falls back to restSeconds if not set */
-  restBetweenSetsSeconds?: number
+  
+  /** Progressive overload strategy for this exercise */
+  progressionType?: ProgressionType
+  /** Step to increase on success (e.g. 2.5 for weight, 1 for reps) */
+  progressionStep?: number
 }
 
 export interface WorkoutPlan {
@@ -52,8 +57,14 @@ export interface LoggedSet {
   reps: number
   /** Actual weight used (kg) */
   weight: number
-  /** Whether this set was completed as planned */
+  /** Whether this set was performed */
   completed: boolean
+  /**
+   * true  = weight >= plannedWeight AND reps >= plannedReps
+   * false = user entered less weight or fewer reps than planned
+   * Used for circle color: green vs red
+   */
+  isSuccess: boolean
   /** ISO timestamp */
   completedAt?: string
 }
@@ -65,24 +76,38 @@ export interface LoggedExercise {
   plannedWeight: number
   actualSets: LoggedSet[]
   /**
-   * true  = all sets completed at planned weight/reps (success → +2.5 kg next time)
-   * false = partial / failed (counts as 1 fail toward deload trigger)
+   * true  = ALL sets had isSuccess === true (→ +2.5 kg next time)
+   * false = at least one set failed / exercise was skipped
+   *         (counts as 1 fail toward deload trigger)
    */
   success: boolean
+  /** Whether the exercise was skipped entirely */
+  skipped: boolean
+
+  // ── Progression Suggestions ──
+  suggestedNextWeight?: number
+  suggestedNextReps?: number
 }
 
 export interface WorkoutLog {
   id: string
   scheduledWorkoutId?: string
   workoutPlanId: string
+  planName: string
   /** ISO date string YYYY-MM-DD */
   date: string
   /** ISO timestamp */
   startTime: string
   /** ISO timestamp; set when session finishes */
-  endTime?: string
-  /** Duration in seconds (derived from start/end) */
-  durationSeconds?: number
+  endTime: string
+  /** Total workout duration in seconds (endTime − startTime) */
+  durationSeconds: number
   exercises: LoggedExercise[]
+  /** Total XP earned during this session */
+  totalXpEarned: number
+  /** true = no exercises were skipped (qualifies for +50 XP full-session bonus) */
+  fullCompletion: boolean
+  /** Whether session ended early (user pressed "Zakończ wcześniej") */
+  endedEarly: boolean
   notes?: string
 }

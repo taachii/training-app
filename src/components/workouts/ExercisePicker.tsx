@@ -185,7 +185,6 @@ export default function ExercisePicker({
       setQuery('')
       setCatFilter('all')
       setMode('list')
-      setTimeout(() => searchRef.current?.focus(), 300)
     }
   }, [isOpen])
 
@@ -230,7 +229,7 @@ export default function ExercisePicker({
         </div>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex flex-shrink-0 items-center justify-between px-4 py-3">
           <h2
             className="text-lg font-bold"
             style={{ fontFamily: 'var(--font-display)', color: 'var(--color-text-primary)' }}
@@ -256,7 +255,7 @@ export default function ExercisePicker({
         ) : (
           <>
             {/* Search */}
-            <div className="px-4 pb-2">
+            <div className="flex-shrink-0 px-4 pb-2">
               <div
                 className="flex items-center gap-2 rounded-xl px-3 py-2.5"
                 style={{
@@ -282,7 +281,7 @@ export default function ExercisePicker({
             </div>
 
             {/* Category filter pills */}
-            <div className="flex gap-2 px-4 pb-3 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+            <div className="flex-shrink-0 flex gap-2 px-4 pb-3 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
               <button
                 onClick={() => setCatFilter('all')}
                 className="flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"

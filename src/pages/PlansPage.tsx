@@ -5,6 +5,7 @@ import { useWorkoutStore } from '@/store/useWorkoutStore'
 import { MUSCLE_GROUP_META } from '@/lib/muscleGroups'
 import type { MuscleGroup } from '@/types/exercise'
 import type { WorkoutPlan } from '@/types/workout'
+import { useSessionStore } from '@/store/useSessionStore'
 
 // ─────────────────────────────────────────────
 // HELPERS
@@ -27,11 +28,12 @@ function getPlanMuscles(plan: WorkoutPlan, exerciseMap: Map<string, MuscleGroup>
 interface PlanCardProps {
   plan: WorkoutPlan
   muscles: MuscleGroup[]
+  isActive: boolean
   onEdit: () => void
   onDelete: () => void
 }
 
-function PlanCard({ plan, muscles, onEdit, onDelete }: PlanCardProps) {
+function PlanCard({ plan, muscles, isActive, onEdit, onDelete }: PlanCardProps) {
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -102,10 +104,10 @@ function PlanCard({ plan, muscles, onEdit, onDelete }: PlanCardProps) {
             color: '#fff',
             boxShadow: '0 4px 16px color-mix(in srgb, #6366f1 30%, transparent)',
           }}
-          aria-label={`Rozpocznij ${plan.name}`}
+          aria-label={`${isActive ? 'Kontynuuj' : 'Rozpocznij'} ${plan.name}`}
         >
           <Dumbbell size={15} />
-          Rozpocznij
+          {isActive ? 'Kontynuuj' : 'Rozpocznij'}
         </button>
 
         {/* Context menu */}
@@ -164,6 +166,7 @@ function PlanCard({ plan, muscles, onEdit, onDelete }: PlanCardProps) {
 export default function PlansPage() {
   const navigate = useNavigate()
   const { plans, exercises, deletePlan } = useWorkoutStore()
+  const { session } = useSessionStore()
 
   // Build a fast exerciseId → primaryMuscleGroup lookup
   const exerciseMap = new Map(exercises.map((e) => [e.id, e.primaryMuscleGroup]))
@@ -256,6 +259,7 @@ export default function PlansPage() {
               key={plan.id}
               plan={plan}
               muscles={getPlanMuscles(plan, exerciseMap)}
+              isActive={session?.workoutPlanId === plan.id}
               onEdit={() => navigate(`/plans/${plan.id}/edit`)}
               onDelete={() => handleDelete(plan.id)}
             />
