@@ -44,10 +44,17 @@ export function calculateProgressionSuggestion(
   plannedWeight: number = 0,
   plannedReps: number = 0
 ): { nextWeight: number; nextReps: number; consecutiveFails: number } {
-  const effectiveWeight = deriveEffectiveWeight(logged)
+  let effectiveWeight = deriveEffectiveWeight(logged)
+  if (effectiveWeight === 0 && plannedWeight > 0) {
+    effectiveWeight = plannedWeight
+  }
+
   // derive reps from max completed reps
   const completedReps = logged.actualSets.filter((s) => s.completed).map(s => s.reps ?? 0)
-  const effectiveReps = completedReps.length > 0 ? Math.max(...completedReps) : 0
+  let effectiveReps = completedReps.length > 0 ? Math.max(...completedReps) : 0
+  if (effectiveReps === 0 && plannedReps > 0) {
+    effectiveReps = plannedReps
+  }
 
   let nextWeight = type === 'weight' ? effectiveWeight : plannedWeight
   let nextReps = type === 'reps' ? effectiveReps : plannedReps
@@ -130,7 +137,7 @@ export const useLogStore = create<LogState>()(
           const exerciseId = logged.exerciseId
           const prev = s.progressionStates[exerciseId] ?? {
             exerciseId,
-            currentWeight: deriveEffectiveWeight(logged),
+            currentWeight: logged.suggestedNextWeight ?? deriveEffectiveWeight(logged),
             consecutiveFails: 0,
             lastUpdated: new Date().toISOString(),
           }
@@ -148,6 +155,7 @@ export const useLogStore = create<LogState>()(
           const updated: ProgressionState = {
             ...prev,
             consecutiveFails,
+            currentWeight: logged.suggestedNextWeight ?? prev.currentWeight,
             lastUpdated: new Date().toISOString(),
           }
 
