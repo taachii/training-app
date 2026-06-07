@@ -5,6 +5,7 @@ import { X, ChevronLeft, ChevronRight, Zap, Clock, Trophy, Check, Plus, Minus, C
 import { useSessionStore } from '@/store/useSessionStore'
 import { useWorkoutStore } from '@/store/useWorkoutStore'
 import { XP_REWARDS } from '@/lib/xpSystem'
+import XpSummaryAnimation from '@/components/workouts/XpSummaryAnimation'
 import { useLogStore } from '@/store/useLogStore'
 import { useProfileStore } from '@/store/useProfileStore'
 import { useScheduleStore } from '@/store/useScheduleStore'
@@ -565,10 +566,11 @@ function RestTimer({ seconds, totalSeconds, onAdjust, onSkip }: RestTimerProps) 
 interface DoneScreenProps {
   planName: string
   log: WorkoutLog | null
+  initialTotalXp: number
   onClose: (applySuggestions: boolean) => void
 }
 
-function DoneScreen({ planName, log, onClose }: DoneScreenProps) {
+function DoneScreen({ planName, log, initialTotalXp, onClose }: DoneScreenProps) {
   const [applySuggestions, setApplySuggestions] = useState(true)
   const [suggestionsExpanded, setSuggestionsExpanded] = useState(false)
   const exercisesDB = useWorkoutStore((s) => s.exercises)
@@ -585,26 +587,22 @@ function DoneScreen({ planName, log, onClose }: DoneScreenProps) {
       style={{ background: 'linear-gradient(180deg, #0f0a28 0%, #1a0a3e 100%)' }}
     >
       <div className="flex flex-col items-center justify-center min-h-full px-6 py-8 gap-6 max-w-md mx-auto w-full">
-      {/* Trophy */}
-      <div
-        className="w-20 h-20 rounded-3xl flex items-center justify-center text-4xl shadow-2xl"
-        style={{ background: 'linear-gradient(135deg, #4338ca, #7c3aed)', boxShadow: '0 0 40px rgba(99,102,241,0.5)' }}
-      >
-        🏋️
-      </div>
-
-      <div className="text-center">
+      <div className="text-center w-full">
         <h1 className="text-2xl font-black mb-1" style={{ fontFamily: 'var(--font-display)', color: '#fff' }}>
           Trening ukończony!
         </h1>
-        <p className="text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>{planName}</p>
+        <p className="text-sm mb-6" style={{ color: 'rgba(255,255,255,0.5)' }}>{planName}</p>
+        
+        <XpSummaryAnimation 
+          initialTotalXp={initialTotalXp} 
+          sessionEarnedXp={log.totalXpEarned} 
+        />
       </div>
 
       {/* Stats */}
-      <div className="w-full grid grid-cols-3 gap-3">
+      <div className="w-full grid grid-cols-2 gap-3 mt-4">
         {[
           { label: 'Czas', value: formatDuration(log.durationSeconds), icon: '⏱️' },
-          { label: 'XP zdobyte', value: `+${log.totalXpEarned}`, icon: '⚡' },
           { label: 'Ukończone', value: `${completedCount}/${log.exercises.length}`, icon: '✅' },
         ].map(({ label, value, icon }) => (
           <div
@@ -1158,6 +1156,7 @@ export default function SessionPage() {
         <DoneScreen
           planName={session.planName}
           log={finalLog}
+          initialTotalXp={session.initialTotalXp}
           onClose={handleDone}
         />
       )}

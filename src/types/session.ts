@@ -98,6 +98,9 @@ export interface ActiveSession {
   /** Total XP earned so far in this session */
   totalXpThisSession: number
 
+  /** Initial XP state before the session started */
+  initialTotalXp: number
+
   /** ISO timestamp of when the session started */
   startTime: string
 

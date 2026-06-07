@@ -1,24 +1,7 @@
 import { useState } from 'react'
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, ChevronDown, ChevronUp } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react'
 import { useScheduleStore } from '@/store/useScheduleStore'
 import DayScheduleModal from './DayScheduleModal'
-
-// Helper to get days of the current week (Mon-Sun)
-function getDaysOfWeek(date: Date) {
-  const current = new Date(date)
-  const day = current.getDay()
-  const diff = current.getDate() - day + (day === 0 ? -6 : 1) // adjust when day is sunday
-  
-  const monday = new Date(current.setDate(diff))
-  const days = []
-  
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(monday)
-    d.setDate(monday.getDate() + i)
-    days.push(d)
-  }
-  return days
-}
 
 // Helper to get days of the 42-day month grid (starting on Monday)
 function getDaysOfMonth(date: Date) {
@@ -43,32 +26,23 @@ function getDaysOfMonth(date: Date) {
 
 export default function WeeklyCalendarWidget() {
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [isExpanded, setIsExpanded] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   
   const today = new Date()
   const { scheduledWorkouts } = useScheduleStore()
   
-  const days = isExpanded ? getDaysOfMonth(currentDate) : getDaysOfWeek(currentDate)
+  const days = getDaysOfMonth(currentDate)
   
   const handlePrev = () => {
     const next = new Date(currentDate)
-    if (isExpanded) {
-      next.setMonth(currentDate.getMonth() - 1)
-    } else {
-      next.setDate(currentDate.getDate() - 7)
-    }
+    next.setMonth(currentDate.getMonth() - 1)
     setCurrentDate(next)
   }
   
   const handleNext = () => {
     const next = new Date(currentDate)
-    if (isExpanded) {
-      next.setMonth(currentDate.getMonth() + 1)
-    } else {
-      next.setDate(currentDate.getDate() + 7)
-    }
+    next.setMonth(currentDate.getMonth() + 1)
     setCurrentDate(next)
   }
 
@@ -86,16 +60,12 @@ export default function WeeklyCalendarWidget() {
       }}
     >
       <div className="flex items-center justify-between mb-1">
-        <button 
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="flex items-center gap-2 px-2 py-1 -ml-2 rounded-lg transition-all active:bg-surface-700"
-        >
+        <div className="flex items-center gap-2 px-2 py-1 -ml-2 rounded-lg">
           <CalendarIcon size={16} style={{ color: '#8b5cf6' }} />
           <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1">
             {currentDate.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' })}
-            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </h2>
-        </button>
+        </div>
         <div className="flex items-center gap-1">
           <button 
             onClick={handlePrev}
@@ -114,15 +84,13 @@ export default function WeeklyCalendarWidget() {
         </div>
       </div>
 
-      {isExpanded && (
-        <div className="grid grid-cols-7 gap-1.5 mb-1">
-          {['PON', 'WT', 'ŚR', 'CZW', 'PT', 'SOB', 'NIE'].map(d => (
-            <div key={d} className="text-[10px] font-medium text-center" style={{ color: 'var(--color-text-muted)' }}>
-              {d}
-            </div>
-          ))}
-        </div>
-      )}
+      <div className="grid grid-cols-7 gap-1.5 mb-1 mt-2">
+        {['PON', 'WT', 'ŚR', 'CZW', 'PT', 'SOB', 'NIE'].map(d => (
+          <div key={d} className="text-[10px] font-medium text-center" style={{ color: 'var(--color-text-muted)' }}>
+            {d}
+          </div>
+        ))}
+      </div>
 
       <div className="grid grid-cols-7 gap-1.5">
         {days.map((day, idx) => {
@@ -132,7 +100,6 @@ export default function WeeklyCalendarWidget() {
             day.getFullYear() === today.getFullYear()
             
           const isCurrentMonth = day.getMonth() === currentDate.getMonth()
-          const dayName = day.toLocaleDateString('pl-PL', { weekday: 'short' }).substring(0, 3)
           
           const dateStr = [
             day.getFullYear(),
@@ -150,17 +117,10 @@ export default function WeeklyCalendarWidget() {
               style={{
                 background: isToday ? 'color-mix(in srgb, #8b5cf6 25%, transparent)' : 'var(--color-surface-700)',
                 border: isToday ? '1px solid #8b5cf6' : '1px solid transparent',
-                opacity: !isExpanded || isCurrentMonth ? 1 : 0.3
+                opacity: isCurrentMonth ? 1 : 0.3
               }}
             >
-              {!isExpanded && (
-                <span 
-                  className="text-[10px] font-medium mb-1 uppercase"
-                  style={{ color: isToday ? '#c4b5fd' : 'var(--color-text-muted)' }}
-                >
-                  {dayName}
-                </span>
-              )}
+
               <span 
                 className="text-sm font-bold"
                 style={{ color: isToday ? '#fff' : 'var(--color-text-primary)' }}

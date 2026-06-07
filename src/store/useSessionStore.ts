@@ -4,6 +4,7 @@ import type { WorkoutPlan, LoggedSet, WorkoutLog, LoggedExercise } from '@/types
 import type { Exercise } from '@/types/exercise'
 import type { ActiveSession, SessionExercise, SessionPhase } from '@/types/session'
 import { calculateEpley1RM } from '@/features/ranks/wilksCalculator'
+import { useProfileStore } from './useProfileStore'
 import { computeExerciseXP, XP_REWARDS } from '@/lib/xpSystem'
 import { useLogStore, calculateProgressionSuggestion } from '@/store/useLogStore'
 
@@ -121,6 +122,7 @@ export const useSessionStore = create<SessionState>()(
       currentExerciseIndex: 0,
       viewIndex:            0,
       totalXpThisSession:   0,
+      initialTotalXp:       useProfileStore.getState().profile?.totalXp ?? 0,
       startTime:            new Date().toISOString(),
     }
 

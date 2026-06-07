@@ -8,7 +8,6 @@ import { useWorkoutStore } from '@/store/useWorkoutStore'
 import LevelBadge from '@/components/ui/LevelBadge'
 import { getLevelMeta } from '@/lib/xpSystem'
 import WeeklyCalendarWidget from '@/components/home/WeeklyCalendarWidget'
-import RanksOverviewWidget from '@/components/home/RanksOverviewWidget'
 
 export default function HomePage() {
   const profile = useProfileStore((s) => s.profile)
@@ -242,9 +241,6 @@ export default function HomePage() {
 
       {/* ── CALENDAR WIDGET ── */}
       <WeeklyCalendarWidget />
-
-      {/* ── RANKS OVERVIEW ── */}
-      <RanksOverviewWidget />
 
     </div>
   )

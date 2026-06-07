@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useProfileStore, useLevelProgress, useXpForNextLevel } from '@/store/useProfileStore'
 import { getLevelMeta, MAX_LEVEL, LEVEL_TIERS } from '@/lib/xpSystem'
 import { User, Weight, Ruler, ChevronRight, Zap, TrendingUp, Info, X } from 'lucide-react'
+import RanksOverviewWidget from '@/components/home/RanksOverviewWidget'
 import LevelBadge from '@/components/ui/LevelBadge'
 
 const GENDER_LABELS = { male: 'Mężczyzna', female: 'Kobieta' }
@@ -277,6 +278,11 @@ export default function ProfilePage() {
             <ChevronRight size={14} style={{ color: 'var(--color-text-muted)' }} />
           </div>
         ))}
+      </div>
+
+      {/* ── RANKS OVERVIEW ── */}
+      <div className="animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
+        <RanksOverviewWidget />
       </div>
 
       <TiersModal isOpen={showTiersModal} onClose={() => setShowTiersModal(false)} />

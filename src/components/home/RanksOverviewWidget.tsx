@@ -1,8 +1,6 @@
 import { useProfileStore } from '@/store/useProfileStore'
 import { useLogStore } from '@/store/useLogStore'
 import { computeRank, RANK_DEFINITIONS } from '@/features/ranks/wilksCalculator'
-import { PREDEFINED_EXERCISES } from '@/features/workouts/exerciseLibrary'
-import type { RankDefinition } from '@/types/ranks'
 
 const BIG_LIFTS = [
   { id: 'barbell_bench_press', label: 'Wyciskanie' },
@@ -38,7 +36,6 @@ export default function RanksOverviewWidget() {
       <div className="grid grid-cols-3 gap-2">
         {BIG_LIFTS.map(lift => {
           const rank = getExerciseRank(lift.id)
-          const exercise = PREDEFINED_EXERCISES.find(e => e.id === lift.id)
           
           return (
             <div 
