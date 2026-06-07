@@ -101,7 +101,7 @@ export default function HomePage() {
             className="text-2xl font-bold leading-tight truncate"
             style={{ fontFamily: 'var(--font-display)', color: 'var(--color-text-primary)' }}
           >
-            Cześć, {name}! 👋
+            {name}
           </h1>
           <div className="flex items-center gap-3 mt-1">
             {/* Level label */}
