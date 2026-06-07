@@ -281,13 +281,8 @@ export default function ProfilePage() {
         ))}
       </div>
 
-      {/* ── RANKS OVERVIEW ── */}
-      <div className="animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
-        <RanksOverviewWidget />
-      </div>
-
       {/* ── LOGOUT BUTTON ── */}
-      <div className="animate-fade-in-up mt-6" style={{ animationDelay: '0.3s' }}>
+      <div className="animate-fade-in-up mt-6" style={{ animationDelay: '0.2s' }}>
         <button 
           onClick={async () => await supabase.auth.signOut()}
           className="w-full p-4 rounded-2xl font-bold text-sm tracking-widest uppercase transition-all active:scale-[0.98]"
@@ -295,6 +290,11 @@ export default function ProfilePage() {
         >
           Wyloguj się
         </button>
+      </div>
+
+      {/* ── RANKS OVERVIEW ── */}
+      <div className="animate-fade-in-up mt-4" style={{ animationDelay: '0.25s' }}>
+        <RanksOverviewWidget />
       </div>
 
       <div className="h-24" /> {/* spacer for bottom nav */}
