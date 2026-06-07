@@ -30,10 +30,10 @@ function calculateEstimatedPlanDuration(plan: WorkoutPlan): number {
   
   let totalSeconds = 0;
   
-  // Group exercises by supersetId. If no supersetId, give it a unique ID to keep it separate.
+  // Group exercises by supersetGroupId. If no supersetGroupId, give it a unique ID to keep it separate.
   const groups: Record<string, typeof plan.exercises> = {};
   plan.exercises.forEach((ex, idx) => {
-    const key = ex.supersetId || `single-${idx}`;
+    const key = ex.supersetGroupId || `single-${idx}`;
     if (!groups[key]) groups[key] = [];
     groups[key].push(ex);
   });
