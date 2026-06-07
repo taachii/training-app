@@ -30,14 +30,31 @@ function calculateEstimatedPlanDuration(plan: WorkoutPlan): number {
   
   let totalSeconds = 0;
   
-  for (const ex of plan.exercises) {
-    const setCount = ex.targetSets?.length || 1;
-    const setsTime = setCount * TIME_PER_SET_SECONDS;
-    const restsTime = Math.max(0, setCount - 1) * ex.restSeconds;
-    totalSeconds += setsTime + restsTime;
-  }
+  // Group exercises by supersetId. If no supersetId, give it a unique ID to keep it separate.
+  const groups: Record<string, typeof plan.exercises> = {};
+  plan.exercises.forEach((ex, idx) => {
+    const key = ex.supersetId || `single-${idx}`;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(ex);
+  });
   
-  const transitionsTime = (plan.exercises.length - 1) * TRANSITION_BETWEEN_EXERCISES_SECONDS;
+  Object.values(groups).forEach(group => {
+    let groupSetsTime = 0;
+    let maxSetCount = 0;
+    let maxRest = 0;
+    
+    group.forEach(ex => {
+      const setCount = ex.targetSets?.length || 1;
+      groupSetsTime += setCount * TIME_PER_SET_SECONDS;
+      if (setCount > maxSetCount) maxSetCount = setCount;
+      if (ex.restSeconds > maxRest) maxRest = ex.restSeconds;
+    });
+    
+    const restsTime = Math.max(0, maxSetCount - 1) * maxRest;
+    totalSeconds += groupSetsTime + restsTime;
+  });
+  
+  const transitionsTime = (Object.keys(groups).length - 1) * TRANSITION_BETWEEN_EXERCISES_SECONDS;
   totalSeconds += transitionsTime;
   
   return Math.ceil(totalSeconds / 60);
