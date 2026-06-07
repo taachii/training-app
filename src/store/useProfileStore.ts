@@ -106,14 +106,14 @@ export const useProfileStore = create<ProfileState>()(
 
       // ── XP & Levelling ───────────────────────────────────────────────
 
-      addXP: (rawAmount, streakMultiplier = 1) => {
+      addXP: (rawAmount) => {
         let profile = get().profile
         if (!profile) {
           profile = makeDefaultProfile()
         }
 
         const oldLevel = profile.level
-        const finalXp = rawAmount
+        const finalXp = Math.floor(rawAmount)
 
         // Clamp to hard cap
         const newTotalXp = Math.min(profile.totalXp + finalXp, MAX_TOTAL_XP)

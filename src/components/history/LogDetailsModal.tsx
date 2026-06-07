@@ -43,9 +43,7 @@ export default function LogDetailsModal({ log, onClose }: LogDetailsModalProps) 
   const d = new Date(log.date)
   const displayDate = d.toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
-  const getExerciseName = (id: string) => {
-    return exercises.find(e => e.id === id)?.name || id
-  }
+
 
   return createPortal(
     <>
