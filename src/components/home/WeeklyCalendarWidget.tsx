@@ -84,7 +84,7 @@ export default function WeeklyCalendarWidget() {
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-1.5 mb-1 mt-2">
+      <div className="grid grid-cols-7 gap-1 mb-1 mt-1">
         {['PON', 'WT', 'ŚR', 'CZW', 'PT', 'SOB', 'NIE'].map(d => (
           <div key={d} className="text-[10px] font-medium text-center" style={{ color: 'var(--color-text-muted)' }}>
             {d}
@@ -92,7 +92,7 @@ export default function WeeklyCalendarWidget() {
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-1.5">
+      <div className="grid grid-cols-7 gap-1">
         {days.map((day, idx) => {
           const isToday = 
             day.getDate() === today.getDate() && 
@@ -110,10 +110,10 @@ export default function WeeklyCalendarWidget() {
           const hasWorkouts = scheduledWorkouts.some(sw => sw.date === dateStr && !sw.isCompleted)
 
           return (
-            <button
+            <button 
               key={idx}
               onClick={() => handleDayClick(day)}
-              className="flex flex-col items-center justify-center py-2 rounded-xl transition-all active:scale-95 cursor-pointer"
+              className="flex flex-col items-center justify-center py-1 rounded-lg transition-all active:scale-95 cursor-pointer"
               style={{
                 background: isToday ? 'color-mix(in srgb, #8b5cf6 25%, transparent)' : 'var(--color-surface-700)',
                 border: isToday ? '1px solid #8b5cf6' : '1px solid transparent',
@@ -122,13 +122,13 @@ export default function WeeklyCalendarWidget() {
             >
 
               <span 
-                className="text-sm font-bold"
+                className="text-sm font-bold leading-none"
                 style={{ color: isToday ? '#fff' : 'var(--color-text-primary)' }}
               >
                 {day.getDate()}
               </span>
               <div 
-                className="w-1.5 h-1.5 rounded-full mt-1.5"
+                className="w-1 h-1 rounded-full mt-1"
                 style={{ background: hasWorkouts ? '#34d399' : 'transparent' }}
               />
             </button>
