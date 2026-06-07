@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
-import { useProfileStore } from '@/store/useProfileStore'
+import { useSyncEngine } from '@/lib/syncEngine'
 import AppLayout    from '@/components/layout/AppLayout'
 import AuthPage     from '@/pages/AuthPage'
 import HomePage     from '@/pages/HomePage'
@@ -18,12 +18,12 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
 
+  // Initialize Sync Engine
+  useSyncEngine()
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
-      if (session?.user?.user_metadata?.nickname) {
-        useProfileStore.getState().updateProfile({ name: session.user.user_metadata.nickname })
-      }
       setLoading(false)
     })
 
@@ -31,9 +31,6 @@ export default function App() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
-      if (session?.user?.user_metadata?.nickname) {
-        useProfileStore.getState().updateProfile({ name: session.user.user_metadata.nickname })
-      }
     })
 
     return () => subscription.unsubscribe()
