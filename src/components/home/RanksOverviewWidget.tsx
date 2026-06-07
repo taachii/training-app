@@ -33,7 +33,14 @@ export default function RanksOverviewWidget() {
         Moje Rangi
       </h2>
       
-      <div className="grid grid-cols-3 gap-2">
+      <div className="relative">
+        <div className="absolute inset-0 z-10 flex items-center justify-center">
+          <div className="px-3 py-1.5 rounded-lg font-bold text-xs shadow-lg flex items-center gap-2" style={{ background: 'var(--color-surface-600)', color: 'var(--color-text-primary)' }}>
+            🚧 Praca w toku
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-3 gap-2 opacity-30 pointer-events-none grayscale">
         {BIG_LIFTS.map(lift => {
           const rank = getExerciseRank(lift.id)
           
@@ -58,6 +65,7 @@ export default function RanksOverviewWidget() {
             </div>
           )
         })}
+        </div>
       </div>
     </div>
   )
