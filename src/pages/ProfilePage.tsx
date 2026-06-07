@@ -1,6 +1,8 @@
+import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useProfileStore, useLevelProgress, useXpForNextLevel } from '@/store/useProfileStore'
-import { getLevelMeta, MAX_LEVEL } from '@/lib/xpSystem'
-import { User, Weight, Ruler, ChevronRight, Zap, TrendingUp } from 'lucide-react'
+import { getLevelMeta, MAX_LEVEL, LEVEL_TIERS } from '@/lib/xpSystem'
+import { User, Weight, Ruler, ChevronRight, Zap, TrendingUp, Info, X } from 'lucide-react'
 import LevelBadge from '@/components/ui/LevelBadge'
 
 const GENDER_LABELS = { male: 'Mężczyzna', female: 'Kobieta' }
@@ -22,9 +24,18 @@ function LevelProgressCard({ level, xp }: { level: number; xp: number }) {
     >
       <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--color-surface-600)' }}>
         <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
-            Postęp Poziomu
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+              Postęp Poziomu
+            </p>
+            <button 
+              onClick={() => document.dispatchEvent(new CustomEvent('open-tiers-modal'))}
+              className="w-5 h-5 flex items-center justify-center rounded-full transition-all active:scale-90"
+              style={{ background: 'color-mix(in srgb, #818cf8 15%, transparent)' }}
+            >
+              <Info size={12} style={{ color: '#818cf8' }} />
+            </button>
+          </div>
           <span
             className="text-xs font-bold px-2 py-0.5 rounded-lg"
             style={{
@@ -76,11 +87,84 @@ function LevelProgressCard({ level, xp }: { level: number; xp: number }) {
 }
 
 // ─────────────────────────────────────────────
+// TIERS MODAL
+// ─────────────────────────────────────────────
+
+function TiersModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  if (!isOpen) return null
+
+  // Re-order to show from level 1 up to prestige
+  const sortedTiers = [...LEVEL_TIERS].reverse()
+
+  return createPortal(
+    <>
+      <div 
+        className="fixed inset-0 z-50 transition-opacity" 
+        style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)' }} 
+        onClick={onClose} 
+      />
+      <div 
+        className="fixed inset-0 z-50 p-6 animate-fade-in-up flex flex-col gap-4 overflow-y-auto"
+        style={{ background: 'var(--color-surface-900)' }}
+      >
+        <div className="flex justify-between items-center mb-2">
+          <h2 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-display)', color: 'var(--color-text-primary)' }}>
+            Tytuły Siłowniane
+          </h2>
+          <button 
+            onClick={onClose}
+            className="w-10 h-10 flex items-center justify-center rounded-full transition-all active:scale-90 flex-shrink-0"
+            style={{ background: 'var(--color-surface-800)' }}
+          >
+            <X size={20} color="var(--color-text-secondary)" />
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          {sortedTiers.map(({ minLevel, meta }, i) => {
+            const nextMin = sortedTiers[i + 1]?.minLevel
+            const levelRange = nextMin ? `${minLevel}-${nextMin - 1}` : `${minLevel}+`
+            
+            return (
+              <div 
+                key={minLevel} 
+                className="flex items-center gap-4 p-4 rounded-2xl"
+                style={{ background: 'var(--color-surface-800)', border: `1px solid color-mix(in srgb, ${meta.ringColor} 20%, var(--color-surface-600))` }}
+              >
+                <div 
+                  className="w-12 h-12 flex items-center justify-center rounded-full text-xl"
+                  style={{ background: `color-mix(in srgb, ${meta.color} 15%, transparent)`, border: `1px solid ${meta.ringColor}` }}
+                >
+                  {meta.icon}
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-bold text-lg" style={{ color: meta.ringColor }}>{meta.label}</h4>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--color-text-muted)' }}>Poziomy {levelRange}</p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </>,
+    document.body
+  )
+}
+
+// ─────────────────────────────────────────────
 // PROFILE PAGE
 // ─────────────────────────────────────────────
 
 export default function ProfilePage() {
   const profile = useProfileStore((s) => s.profile)
+  const [showTiersModal, setShowTiersModal] = useState(false)
+
+  // Listen to the custom event from the card
+  useState(() => {
+    const handler = () => setShowTiersModal(true)
+    document.addEventListener('open-tiers-modal', handler)
+    return () => document.removeEventListener('open-tiers-modal', handler)
+  })
 
   const name    = profile?.name ?? '—'
   const gender  = profile?.gender
@@ -194,6 +278,8 @@ export default function ProfilePage() {
           </div>
         ))}
       </div>
+
+      <TiersModal isOpen={showTiersModal} onClose={() => setShowTiersModal(false)} />
     </div>
   )
 }

@@ -3,15 +3,15 @@ import {
   Home,
   Trophy,
   Dumbbell,
-  BarChart2,
   Users,
+  BookOpen
 } from 'lucide-react'
 
 const NAV_ITEMS = [
   { to: '/',          label: 'Home',      Icon: Home        },
   { to: '/rankings',  label: 'Rankingi',  Icon: Trophy      },
   { to: '/plans',     label: 'Plany',     Icon: Dumbbell    },
-  { to: '/stats',     label: 'Statsy',    Icon: BarChart2   },
+  { to: '/history',   label: 'Dziennik',  Icon: BookOpen    },
   { to: '/friends',   label: 'Znajomi',   Icon: Users       },
 ] as const
 

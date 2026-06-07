@@ -20,9 +20,13 @@ function exerciseToPlanItem(ex: Exercise, order: number): PlanExercise {
   return {
     exerciseId: ex.id,
     order,
-    sets: ex.defaultSets,
-    reps: ex.defaultReps,
-    weight: ex.defaultWeight ?? 0,
+    targetSets: Array.from({ length: ex.defaultSets }).map(() => ({
+      type: ex.type || 'reps',
+      reps: ex.type === 'time' ? undefined : ex.defaultReps,
+      timeSeconds: ex.type === 'time' ? 60 : undefined,
+      weight: ex.type === 'time' ? undefined : (ex.defaultWeight ?? 0)
+    })),
+    isAdvanced: false,
     restSeconds: ex.defaultRestSeconds,
   }
 }
@@ -68,6 +72,27 @@ export default function PlanFormPage() {
       exercise: ex,
     }
     setRows((prev) => [...prev, newRow])
+  }
+
+  const toggleSuperset = (index: number) => {
+    setRows((prev) => {
+      const arr = [...prev]
+      const prevRow = arr[index - 1]
+      const currRow = arr[index]
+      
+      if (!prevRow || !currRow) return prev
+
+      // If already in the same superset group as previous, remove it
+      if (currRow.supersetGroupId && currRow.supersetGroupId === prevRow.supersetGroupId) {
+        arr[index] = { ...currRow, supersetGroupId: undefined }
+      } else {
+        // Create or reuse group ID from previous row
+        const newGroupId = prevRow.supersetGroupId || `super_${Date.now()}_${index}`
+        arr[index - 1] = { ...prevRow, supersetGroupId: newGroupId }
+        arr[index] = { ...currRow, supersetGroupId: newGroupId }
+      }
+      return arr
+    })
   }
 
   const updateRow = (index: number, updated: PlanExerciseRowData) => {
@@ -250,16 +275,19 @@ export default function PlanFormPage() {
           )}
 
           {/* Exercise rows */}
-          {rows.map((row, i) => (
-            <div key={row.exerciseId + i} className="animate-fade-in-up" style={{ animationDelay: `${i * 0.03}s` }}>
+          {rows.map((row, index) => (
+            <div key={`${row.exerciseId}-${index}`} className="animate-fade-in-up" style={{ animationDelay: `${index * 0.03}s` }}>
               <PlanExerciseRow
                 data={row}
-                index={i}
+                index={index}
                 total={rows.length}
-                onChange={(updated) => updateRow(i, updated)}
-                onDelete={() => deleteRow(i)}
-                onMoveUp={() => moveRow(i, -1)}
-                onMoveDown={() => moveRow(i, 1)}
+                hasSupersetWithPrev={index > 0 && !!row.supersetGroupId && row.supersetGroupId === rows[index - 1]?.supersetGroupId}
+                hasSupersetWithNext={index < rows.length - 1 && !!row.supersetGroupId && row.supersetGroupId === rows[index + 1]?.supersetGroupId}
+                onChange={(updated) => updateRow(index, updated)}
+                onDelete={() => deleteRow(index)}
+                onMoveUp={() => moveRow(index, -1)}
+                onMoveDown={() => moveRow(index, 1)}
+                onToggleSuperset={() => toggleSuperset(index)}
               />
             </div>
           ))}
@@ -280,21 +308,7 @@ export default function PlanFormPage() {
           </button>
         </div>
 
-        {/* Bottom note about progression */}
-        {rows.length > 0 && (
-          <div
-            className="rounded-2xl p-4 animate-fade-in-up"
-            style={{
-              background: 'color-mix(in srgb, #6366f1 8%, transparent)',
-              border: '1px solid color-mix(in srgb, #6366f1 20%, transparent)',
-              animationDelay: '0.1s',
-            }}
-          >
-            <p className="text-xs leading-relaxed" style={{ color: '#a5b4fc' }}>
-              💡 <strong>Ciężary to sugestie startowe.</strong> W trakcie sesji możesz edytować każde powtórzenie i ciężar inline — algorytm progresji uczy się z Twoich rzeczywistych wyników.
-            </p>
-          </div>
-        )}
+
       </div>
 
       {/* ── EXERCISE PICKER ── */}

@@ -87,7 +87,7 @@ export function levelFromTotalXp(totalXp: number): {
   }
 
   const levelStartXp = totalXpForLevel(level)
-  const nextLvlXp    = xpForNextLevel(level)
+  const nextLvlXp = xpForNextLevel(level)
   const currentLevelXp = clampedXp - levelStartXp
 
   return {
@@ -109,9 +109,9 @@ export function computeExerciseXP(params: {
   isSuccessfulProgression: boolean
   isPersonalRecord: boolean
 }): { total: number; breakdown: Record<string, number> } {
-  const base       = XP_REWARDS.BASE_COMPLETION
+  const base = XP_REWARDS.BASE_COMPLETION
   const progression = params.isSuccessfulProgression ? XP_REWARDS.SUCCESSFUL_PROGRESSION : 0
-  const prBonus    = params.isPersonalRecord ? XP_REWARDS.PERSONAL_RECORD : 0
+  const prBonus = params.isPersonalRecord ? XP_REWARDS.PERSONAL_RECORD : 0
 
   const total = base + progression + prBonus
 
@@ -132,16 +132,16 @@ export function computeExerciseXP(params: {
 // ─────────────────────────────────────────────
 
 export type LevelTier =
-  | 'recruit'    // 1–5
-  | 'warrior'    // 6–10
-  | 'fighter'    // 11–15
-  | 'gladiator'  // 16–20
-  | 'champion'   // 21–25
-  | 'expert'     // 26–30
-  | 'master'     // 31–35
-  | 'elite'      // 36–40
-  | 'legend'     // 41–49
-  | 'prestige'   // 50
+  | 'kanapowicz'   // 1–5
+  | 'suchoklates'  // 6–10
+  | 'pilatesiarz'  // 11–15
+  | 'pozeracz'     // 16–20
+  | 'spoceniec'    // 21–25
+  | 'gymbro'       // 26–30
+  | 'sztangolamacz'// 31–35
+  | 'kark'         // 36–40
+  | 'testosteron'  // 41–49
+  | 'gigachad'     // 50
 
 export interface LevelMeta {
   tier: LevelTier
@@ -151,17 +151,17 @@ export interface LevelMeta {
   ringColor: string  // SVG stroke color
 }
 
-const LEVEL_TIERS: Array<{ minLevel: number; meta: LevelMeta }> = [
-  { minLevel: 50, meta: { tier: 'prestige',  label: 'Prestige',  icon: '⭐', color: '#ffd700', ringColor: '#fbbf24' } },
-  { minLevel: 41, meta: { tier: 'legend',    label: 'Legend',    icon: '☄️', color: '#f43f5e', ringColor: '#fb7185' } },
-  { minLevel: 36, meta: { tier: 'elite',     label: 'Elite',     icon: '🔥', color: '#f97316', ringColor: '#fb923c' } },
-  { minLevel: 31, meta: { tier: 'master',    label: 'Master',    icon: '⚡', color: '#8b5cf6', ringColor: '#a78bfa' } },
-  { minLevel: 26, meta: { tier: 'expert',    label: 'Expert',    icon: '👑', color: '#6366f1', ringColor: '#818cf8' } },
-  { minLevel: 21, meta: { tier: 'champion',  label: 'Champion',  icon: '🥇', color: '#eab308', ringColor: '#facc15' } },
-  { minLevel: 16, meta: { tier: 'gladiator', label: 'Gladiator', icon: '🥈', color: '#6b7280', ringColor: '#9ca3af' } },
-  { minLevel: 11, meta: { tier: 'fighter',   label: 'Fighter',   icon: '🥉', color: '#cd7f32', ringColor: '#d97706' } },
-  { minLevel: 6,  meta: { tier: 'warrior',   label: 'Warrior',   icon: '⚔️', color: '#ef4444', ringColor: '#f87171' } },
-  { minLevel: 1,  meta: { tier: 'recruit',   label: 'Recruit',   icon: '🛡️', color: '#6366f1', ringColor: '#818cf8' } },
+export const LEVEL_TIERS: Array<{ minLevel: number; meta: LevelMeta }> = [
+  { minLevel: 50, meta: { tier: 'gigachad',      label: 'Gigachad',        icon: '🗿', color: '#ffd700', ringColor: '#fbbf24' } }, // Gold
+  { minLevel: 41, meta: { tier: 'testosteron',   label: 'Mr. Testosteron', icon: '💉', color: '#ef4444', ringColor: '#f87171' } }, // Red
+  { minLevel: 36, meta: { tier: 'kark',          label: 'Kark',            icon: '🦍', color: '#f97316', ringColor: '#fb923c' } }, // Orange
+  { minLevel: 31, meta: { tier: 'sztangolamacz', label: 'Sztangołamacz',   icon: '💥', color: '#22c55e', ringColor: '#4ade80' } }, // Green
+  { minLevel: 26, meta: { tier: 'gymbro',        label: 'Gym Bro',         icon: '🤜', color: '#8b5cf6', ringColor: '#a78bfa' } }, // Violet
+  { minLevel: 21, meta: { tier: 'spoceniec',     label: 'Spoceniec',       icon: '💦', color: '#3b82f6', ringColor: '#60a5fa' } }, // Blue
+  { minLevel: 16, meta: { tier: 'pozeracz',      label: 'Pożeracz Ryżu',   icon: '🍚', color: '#d97706', ringColor: '#fbbf24' } }, // Amber
+  { minLevel: 11, meta: { tier: 'pilatesiarz',   label: 'Pilatesiarz',     icon: '🧘', color: '#ec4899', ringColor: '#f472b6' } }, // Pink
+  { minLevel: 6,  meta: { tier: 'suchoklates',   label: 'Suchoklates',     icon: '🦴', color: '#14b8a6', ringColor: '#2dd4bf' } }, // Teal
+  { minLevel: 1,  meta: { tier: 'kanapowicz',    label: 'Kanapowicz',      icon: '🛋️', color: '#94a3b8', ringColor: '#cbd5e1' } }, // Slate
 ]
 
 export function getLevelMeta(level: number): LevelMeta {

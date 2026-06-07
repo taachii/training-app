@@ -106,10 +106,10 @@ export const useProfileStore = create<ProfileState>()(
 
       // ── XP & Levelling ───────────────────────────────────────────────
 
-      addXP: (rawAmount) => {
-        const profile = get().profile
+      addXP: (rawAmount, streakMultiplier = 1) => {
+        let profile = get().profile
         if (!profile) {
-          return { xpGained: 0, leveledUp: false, newLevel: 1, oldLevel: 1, cappedAtMax: false }
+          profile = makeDefaultProfile()
         }
 
         const oldLevel = profile.level
@@ -122,10 +122,10 @@ export const useProfileStore = create<ProfileState>()(
         const { level: newLevel, currentLevelXp } = levelFromTotalXp(newTotalXp)
 
         set((s) => {
-          if (!s.profile) return s
+          const base = s.profile ?? profile!
           return {
             profile: {
-              ...s.profile,
+              ...base,
               totalXp: newTotalXp,
               level: Math.min(newLevel, MAX_LEVEL),
               xp: currentLevelXp,

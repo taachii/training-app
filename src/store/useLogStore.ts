@@ -4,7 +4,6 @@ import type { WorkoutLog, LoggedExercise } from '@/types/workout'
 import type { PersonalRecord } from '@/types/ranks'
 import type { ProgressionState } from '@/types/progression'
 import { PROGRESSION_DEFAULTS } from '@/types/progression'
-import { useWorkoutStore } from '@/store/useWorkoutStore'
 
 // ─────────────────────────────────────────────
 // HELPERS — derive effective weight from actual log
@@ -19,9 +18,12 @@ import { useWorkoutStore } from '@/store/useWorkoutStore'
  * never from blueprint assumptions.
  */
 function deriveEffectiveWeight(logged: LoggedExercise): number {
-  const completed = logged.actualSets.filter((s) => s.completed && s.weight > 0)
-  if (completed.length === 0) return logged.plannedWeight
-  return Math.max(...completed.map((s) => s.weight))
+  const completed = logged.actualSets.filter((s) => s.completed && (s.weight ?? 0) > 0)
+  if (completed.length === 0) {
+     // fallback to first actual set's weight if any, else 0
+     return logged.actualSets[0]?.weight ?? 0
+  }
+  return Math.max(...completed.map((s) => s.weight ?? 0))
 }
 
 /**
@@ -38,13 +40,17 @@ export function calculateProgressionSuggestion(
   logged: LoggedExercise,
   prevFails: number,
   type: 'weight' | 'reps' | 'none' = 'weight',
-  step?: number
+  step?: number,
+  plannedWeight: number = 0,
+  plannedReps: number = 0
 ): { nextWeight: number; nextReps: number; consecutiveFails: number } {
   const effectiveWeight = deriveEffectiveWeight(logged)
-  const effectiveReps = logged.plannedReps
+  // derive reps from max completed reps
+  const completedReps = logged.actualSets.filter((s) => s.completed).map(s => s.reps ?? 0)
+  const effectiveReps = completedReps.length > 0 ? Math.max(...completedReps) : 0
 
-  let nextWeight = effectiveWeight
-  let nextReps = effectiveReps
+  let nextWeight = type === 'weight' ? effectiveWeight : plannedWeight
+  let nextReps = type === 'reps' ? effectiveReps : plannedReps
   let consecutiveFails = prevFails
 
   if (type === 'none') {
@@ -101,8 +107,8 @@ interface LogState {
    *   consecutiveFails >= 2 → deload -10% (round to 0.25 kg), reset consecutiveFails to 0
    */
   updateProgressionAfterSession: (loggedExercise: LoggedExercise) => void
-
   updatePersonalRecord: (pr: PersonalRecord) => void
+  removeLog: (id: string) => void
   clearLogs: () => void
 }
 
@@ -115,6 +121,9 @@ export const useLogStore = create<LogState>()(
 
       addLog: (log) =>
         set((s) => ({ logs: [log, ...s.logs] })),
+
+      removeLog: (id) =>
+        set((s) => ({ logs: s.logs.filter(log => log.id !== id) })),
 
       updateProgressionAfterSession: (logged) =>
         set((s) => {

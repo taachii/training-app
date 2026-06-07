@@ -44,11 +44,10 @@ export interface SessionExercise extends PlanExercise {
 
   /**
    * Inline-editable inputs for the current set being performed.
-   * These start at the planned weight/reps (or progression suggestion)
-   * and the user can modify them freely before logging.
    */
   inputWeight: number
   inputReps: number
+  inputTimeSeconds: number
 
   /**
    * All sets logged so far for this exercise.

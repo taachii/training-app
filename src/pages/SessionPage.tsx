@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState, useCallback, useLayoutEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { X, ChevronLeft, ChevronRight, Zap, Clock, Trophy, Check, Plus, Minus, ChevronDown, ChevronUp } from 'lucide-react'
+import { X, ChevronLeft, ChevronRight, Zap, Clock, Trophy, Check, Plus, Minus, ChevronDown, ChevronUp, Link } from 'lucide-react'
 
 import { useSessionStore } from '@/store/useSessionStore'
 import { useWorkoutStore } from '@/store/useWorkoutStore'
+import { XP_REWARDS } from '@/lib/xpSystem'
 import { useLogStore } from '@/store/useLogStore'
-import type { WorkoutLog } from '@/types/workout'
 import { useProfileStore } from '@/store/useProfileStore'
+import { useScheduleStore } from '@/store/useScheduleStore'
 import { MUSCLE_GROUP_META } from '@/lib/muscleGroups'
 import type { SessionExercise } from '@/types/session'
+import type { WorkoutLog } from '@/types/workout'
 
 // ─────────────────────────────────────────────
 // HELPERS
@@ -158,6 +160,7 @@ interface ExerciseCardProps {
   totalCount: number
   onUpdateWeight: (weight: number) => void
   onUpdateReps: (delta: number) => void
+  onUpdateTime: (delta: number) => void
   onUpdateSets: (delta: number) => void
   onLogSet: () => void
   onNextExercise: () => void
@@ -167,7 +170,7 @@ interface ExerciseCardProps {
 
 function ExerciseCard({
   exercise, isCurrent, planIndex, totalCount,
-  onUpdateWeight, onUpdateReps, onUpdateSets, onLogSet, onNextExercise, isResting, isLastInSession,
+  onUpdateWeight, onUpdateReps, onUpdateTime, onUpdateSets, onLogSet, onNextExercise, isResting, isLastInSession,
 }: ExerciseCardProps) {
   const muscleMeta = MUSCLE_GROUP_META[exercise.primaryMuscleGroup]
   const isSkipped = exercise.status === 'skipped'
@@ -188,13 +191,24 @@ function ExerciseCard({
       {/* ── Exercise header ── */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1 min-w-0">
-          {/* Muscle badge */}
-          <span
-            className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-md mb-2"
-            style={{ background: `${muscleMeta.color}22`, color: muscleMeta.color }}
-          >
-            {muscleMeta.label}
-          </span>
+          {/* Muscle badge + Superset badge */}
+          <div className="flex items-center gap-2 mb-2">
+            <span
+              className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-md"
+              style={{ background: `${muscleMeta.color}22`, color: muscleMeta.color }}
+            >
+              {muscleMeta.label}
+            </span>
+            {exercise.supersetGroupId && (
+              <span
+                className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md"
+                style={{ background: '#6366f122', color: '#818cf8' }}
+              >
+                <Link size={10} />
+                Superset
+              </span>
+            )}
+          </div>
 
           <h2
             className="text-xl font-black leading-tight"
@@ -208,7 +222,7 @@ function ExerciseCard({
 
           <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.5)' }}>
             Ćwiczenie {planIndex} z {totalCount} ·{' '}
-            {exercise.sets} serie × {exercise.reps} powt. ·{' '}
+            {exercise.targetSets.length} serie ·{' '}
             {exercise.restSeconds}s przerwa
           </p>
         </div>
@@ -240,7 +254,7 @@ function ExerciseCard({
         {isCurrent && !isDone && !isSkipped && (
           <button
             onClick={() => onUpdateSets(-1)}
-            disabled={exercise.sets <= Math.max(1, exercise.currentSetIndex + (exercise.loggedSets.length > exercise.currentSetIndex ? 1 : 0))}
+            disabled={exercise.targetSets.length <= Math.max(1, exercise.currentSetIndex + (exercise.loggedSets.length > exercise.currentSetIndex ? 1 : 0))}
             className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 disabled:opacity-30 active:scale-90 transition-all"
             style={{ background: 'rgba(255,255,255,0.1)', color: '#fff' }}
           >
@@ -249,7 +263,7 @@ function ExerciseCard({
         )}
 
         <SetCircles
-          totalSets={exercise.sets}
+          totalSets={exercise.targetSets.length}
           currentSetIndex={exercise.currentSetIndex}
           loggedSets={exercise.loggedSets}
           status={exercise.status}
@@ -258,7 +272,7 @@ function ExerciseCard({
         {isCurrent && !isDone && !isSkipped && (
           <button
             onClick={() => onUpdateSets(1)}
-            disabled={exercise.sets >= 20}
+            disabled={exercise.targetSets.length >= 20}
             className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 disabled:opacity-30 active:scale-90 transition-all"
             style={{ background: 'rgba(255,255,255,0.1)', color: '#fff' }}
           >
@@ -276,75 +290,104 @@ function ExerciseCard({
               className="text-xs font-semibold px-3 py-1 rounded-full"
               style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.3)' }}
             >
-              Seria {exercise.currentSetIndex + 1} z {exercise.sets}
+              Seria {exercise.currentSetIndex + 1} z {exercise.targetSets.length}
             </span>
           </div>
 
-          {/* Weight stepper */}
-          {!isPureBodyweight && (
-            <div className="flex flex-col items-center gap-1 mb-4">
-              <p className="text-[10px] uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                Ciężar
-              </p>
-              <div className="relative flex items-center">
-                <input
-                  type="number"
-                  min={0}
-                  max={999}
-                  step={0.25}
-                  value={exercise.inputWeight === 0 ? '' : exercise.inputWeight}
-                  onChange={(e) => {
-                    const val = e.target.value
-                    if (val === '') {
-                      onUpdateWeight(0)
-                      return
-                    }
-                    onUpdateWeight(parseFloat(val) || 0)
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.currentTarget.blur()
-                    }
-                  }}
-                  disabled={isResting}
-                  className="h-10 w-28 rounded-xl text-center text-xl font-bold outline-none disabled:opacity-50"
-                  style={{
-                    background: 'rgba(255,255,255,0.08)',
-                    color: '#fff',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    paddingRight: '22px',
-                  }}
-                  placeholder="0"
-                />
-                <span
-                  className="absolute right-3 text-[11px] font-semibold pointer-events-none"
-                  style={{ color: 'rgba(255,255,255,0.4)' }}
-                >
-                  kg
-                </span>
-              </div>
-              <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                Plan: {exercise.weight} kg
-              </p>
-            </div>
-          )}
+          {(() => {
+            const currentTarget = exercise.targetSets[exercise.currentSetIndex] || exercise.targetSets[exercise.targetSets.length - 1]
+            const isTimeBased = currentTarget?.type === 'time'
 
-          {/* Reps stepper */}
-          <div className="flex flex-col items-center gap-1 mb-5">
-            <p className="text-[10px] uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.4)' }}>
-              Powtórzenia
-            </p>
-            <Stepper
-              value={exercise.inputReps}
-              onIncrement={() => onUpdateReps(1)}
-              onDecrement={() => onUpdateReps(-1)}
-              suffix="powt."
-              disabled={isResting}
-            />
-            <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.35)' }}>
-              Plan: {exercise.reps} powt.
-            </p>
-          </div>
+            if (isTimeBased) {
+              return (
+                <div className="flex flex-col items-center gap-1 mb-5">
+                  <p className="text-[10px] uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                    Czas
+                  </p>
+                  <Stepper
+                    value={exercise.inputTimeSeconds}
+                    onIncrement={() => onUpdateTime(5)}
+                    onDecrement={() => onUpdateTime(-5)}
+                    suffix="s"
+                    disabled={isResting}
+                  />
+                  <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                    Plan: {currentTarget.timeSeconds} s
+                  </p>
+                </div>
+              )
+            }
+
+            return (
+              <>
+                {/* Weight stepper */}
+                {!isPureBodyweight && (
+                  <div className="flex flex-col items-center gap-1 mb-4">
+                    <p className="text-[10px] uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                      Ciężar
+                    </p>
+                    <div className="relative flex items-center">
+                      <input
+                        type="number"
+                        min={0}
+                        max={999}
+                        step={0.25}
+                        value={exercise.inputWeight === 0 ? '' : exercise.inputWeight}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          if (val === '') {
+                            onUpdateWeight(0)
+                            return
+                          }
+                          onUpdateWeight(parseFloat(val) || 0)
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.currentTarget.blur()
+                          }
+                        }}
+                        disabled={isResting}
+                        className="h-10 w-28 rounded-xl text-center text-xl font-bold outline-none disabled:opacity-50"
+                        style={{
+                          background: 'rgba(255,255,255,0.08)',
+                          color: '#fff',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          paddingRight: '22px',
+                        }}
+                        placeholder="0"
+                      />
+                      <span
+                        className="absolute right-3 text-[11px] font-semibold pointer-events-none"
+                        style={{ color: 'rgba(255,255,255,0.4)' }}
+                      >
+                        kg
+                      </span>
+                    </div>
+                    <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                      Plan: {currentTarget.weight} kg
+                    </p>
+                  </div>
+                )}
+
+                {/* Reps stepper */}
+                <div className="flex flex-col items-center gap-1 mb-5">
+                  <p className="text-[10px] uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                    Powtórzenia
+                  </p>
+                  <Stepper
+                    value={exercise.inputReps}
+                    onIncrement={() => onUpdateReps(1)}
+                    onDecrement={() => onUpdateReps(-1)}
+                    suffix="powt."
+                    disabled={isResting}
+                  />
+                  <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                    Plan: {currentTarget.reps} powt.
+                  </p>
+                </div>
+              </>
+            )
+          })()}
 
           {/* Log set button */}
           <button
@@ -380,7 +423,7 @@ function ExerciseCard({
             >
               <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>Seria {s.setNumber}</span>
               <span style={{ color: '#fff', fontSize: 13, fontWeight: 700 }}>
-                {s.weight > 0 ? `${s.weight} kg × ` : ''}{s.reps} powt.
+                {s.timeSeconds !== undefined ? `${s.timeSeconds}s` : `${!isPureBodyweight && (s.weight ?? 0) > 0 ? `${s.weight} kg × ` : ''}${s.reps} powt.`}
               </span>
               <span style={{ color: s.isSuccess ? '#22c55e' : '#ef4444', fontSize: 11, fontWeight: 600 }}>
                 {s.isSuccess ? '✓ OK' : '✕ FAIL'}
@@ -538,9 +581,10 @@ function DoneScreen({ planName, log, onClose }: DoneScreenProps) {
 
   return (
     <div
-      className="absolute inset-0 z-50 flex flex-col items-center justify-center px-6 gap-6"
+      className="absolute inset-0 z-50 overflow-y-auto"
       style={{ background: 'linear-gradient(180deg, #0f0a28 0%, #1a0a3e 100%)' }}
     >
+      <div className="flex flex-col items-center justify-center min-h-full px-6 py-8 gap-6 max-w-md mx-auto w-full">
       {/* Trophy */}
       <div
         className="w-20 h-20 rounded-3xl flex items-center justify-center text-4xl shadow-2xl"
@@ -626,15 +670,17 @@ function DoneScreen({ planName, log, onClose }: DoneScreenProps) {
                 let isOverload = false
 
                 if (isRepsProgression) {
-                  oldVal = `${ex.plannedReps} powt.`
+                  const firstSetReps = ex.actualSets?.[0]?.reps ?? 0
+                  oldVal = `${firstSetReps} powt.`
                   newVal = `${ex.suggestedNextReps} powt.`
-                  const diff = ex.suggestedNextReps! - ex.plannedReps
+                  const diff = ex.suggestedNextReps! - firstSetReps
                   diffText = diff > 0 ? `+${diff}` : `${diff}`
                   isOverload = diff > 0
                 } else {
-                  oldVal = `${ex.plannedWeight}kg`
+                  const firstSetWeight = ex.actualSets?.[0]?.weight ?? 0
+                  oldVal = `${firstSetWeight}kg`
                   newVal = `${ex.suggestedNextWeight}kg`
-                  const diff = ex.suggestedNextWeight! - ex.plannedWeight
+                  const diff = ex.suggestedNextWeight! - firstSetWeight
                   diffText = diff > 0 ? `+${diff}kg` : `${diff}kg`
                   isOverload = diff > 0
                 }
@@ -675,6 +721,7 @@ function DoneScreen({ planName, log, onClose }: DoneScreenProps) {
       >
         Zamknij
       </button>
+      </div>
     </div>
   )
 }
@@ -689,6 +736,7 @@ interface CarouselProps {
   isResting: boolean
   onUpdateWeight: (weight: number) => void
   onUpdateReps: (delta: number) => void
+  onUpdateTime: (delta: number) => void
   onUpdateSets: (delta: number) => void
   onLogSet: () => void
   onNextExercise: () => void
@@ -698,7 +746,7 @@ interface CarouselProps {
 
 function Carousel({
   exercises, viewIndex,
-  isResting, onUpdateWeight, onUpdateReps, onUpdateSets, onLogSet, onNextExercise,
+  isResting, onUpdateWeight, onUpdateReps, onUpdateTime, onUpdateSets, onLogSet, onNextExercise,
   onSwipePrev, onSwipeNext,
 }: CarouselProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -783,6 +831,7 @@ function Carousel({
                 totalCount={exercises.length}
                 onUpdateWeight={onUpdateWeight}
                 onUpdateReps={onUpdateReps}
+                onUpdateTime={onUpdateTime}
                 onUpdateSets={onUpdateSets}
                 onLogSet={onLogSet}
                 onNextExercise={onNextExercise}
@@ -931,7 +980,7 @@ export default function SessionPage() {
     const ex = session.exercises[index]
     const prevPR = personalRecords[ex.exerciseId]?.oneRepMax
 
-    const result = logCurrentSet(index, ex.inputWeight, ex.inputReps, prevPR)
+    const result = logCurrentSet(index, ex.inputWeight, ex.inputReps, ex.inputTimeSeconds, prevPR)
 
     // Award XP immediately
     if (result.xpAwarded > 0) {
@@ -950,14 +999,14 @@ export default function SessionPage() {
       })
     }
 
-    if (!result.isLastSetOfExercise) {
+    if (result.nextPhase.startsWith('resting')) {
       startRestTimer(ex.restSeconds)
     }
   }, [session, logCurrentSet, addXP, updatePersonalRecord, personalRecords, startRestTimer])
 
   const handleUpdateWeight = useCallback((val: number) => {
     if (!session) return
-    updateCurrentInput(session.viewIndex, val, undefined)
+    updateCurrentInput(session.viewIndex, val, undefined, undefined)
   }, [session, updateCurrentInput])
 
   const handleUpdateReps = useCallback((delta: number) => {
@@ -965,7 +1014,15 @@ export default function SessionPage() {
     const ex = session.exercises[session.viewIndex]
     const current = ex.inputReps
     const next = Math.max(1, current + delta)
-    updateCurrentInput(session.viewIndex, undefined, next)
+    updateCurrentInput(session.viewIndex, undefined, next, undefined)
+  }, [session, updateCurrentInput])
+
+  const handleUpdateTime = useCallback((delta: number) => {
+    if (!session) return
+    const ex = session.exercises[session.viewIndex]
+    const current = ex.inputTimeSeconds || 60
+    const next = Math.max(5, current + delta)
+    updateCurrentInput(session.viewIndex, undefined, undefined, next)
   }, [session, updateCurrentInput])
 
   const handleUpdateSets = useCallback((delta: number) => {
@@ -1014,9 +1071,13 @@ export default function SessionPage() {
         const updatedExercises = plan.exercises.map(pe => {
           const logged = finalLog.exercises.find(le => le.exerciseId === pe.exerciseId)
           if (logged && !logged.skipped) {
-            const nextPe = { ...pe }
-            if (logged.suggestedNextWeight !== undefined) nextPe.weight = logged.suggestedNextWeight
-            if (logged.suggestedNextReps !== undefined) nextPe.reps = logged.suggestedNextReps
+            const nextPe = { ...pe, targetSets: pe.targetSets.map(ts => ({ ...ts })) }
+            if (logged.suggestedNextWeight !== undefined) {
+               nextPe.targetSets.forEach(ts => { if (ts.type === 'reps') ts.weight = logged.suggestedNextWeight })
+            }
+            if (logged.suggestedNextReps !== undefined) {
+               nextPe.targetSets.forEach(ts => { if (ts.type === 'reps') ts.reps = logged.suggestedNextReps })
+            }
             return nextPe
           }
           return pe
@@ -1025,7 +1086,20 @@ export default function SessionPage() {
       }
     }
 
-    addXP(finalLog.totalXpEarned)
+    // Mark scheduled workout as completed
+    const scheduleStore = useScheduleStore.getState()
+    const todayStr = finalLog.date
+    // Find the first uncompleted scheduled workout for this plan on this date
+    const matchedSchedule = scheduleStore.scheduledWorkouts.find(
+      sw => sw.date === todayStr && sw.planId === finalLog.workoutPlanId && !sw.isCompleted
+    )
+    if (matchedSchedule) {
+      scheduleStore.markAsCompleted(matchedSchedule.id)
+    }
+
+    if (finalLog.fullCompletion) {
+      addXP(XP_REWARDS.FULL_SESSION_BONUS)
+    }
     clearSession()
     localStorage.removeItem('restExpiresAt')
     localStorage.removeItem('restTotal')
@@ -1033,6 +1107,21 @@ export default function SessionPage() {
   }, [session, finalLog, addLog, updateProgressionAfterSession, addXP, clearSession, navigate])
 
   // ── Render guard ──
+  // Backward compatibility: clear invalid/old session schema
+  if (session && session.exercises.some(ex => !ex.targetSets)) {
+    setTimeout(() => {
+      clearSession()
+    }, 0)
+    return (
+      <div className="min-h-dvh flex flex-col items-center justify-center gap-4" style={{ background: '#0f0a28' }}>
+        <p style={{ color: 'rgba(255,255,255,0.6)' }}>Sesja wygasła (stara wersja formatu). Wróć do strony głównej.</p>
+        <button onClick={() => navigate('/')} style={{ color: '#818cf8' }} className="text-sm">
+          ← Wróć do strony głównej
+        </button>
+      </div>
+    )
+  }
+
   if (!session) {
     return (
       <div
@@ -1230,6 +1319,7 @@ export default function SessionPage() {
               isResting={isResting && restSec > 0}
               onUpdateWeight={handleUpdateWeight}
               onUpdateReps={handleUpdateReps}
+              onUpdateTime={handleUpdateTime}
               onUpdateSets={handleUpdateSets}
               onLogSet={() => handleLogSet(session.viewIndex)}
               onNextExercise={() => advanceToNextExercise(session.viewIndex)}

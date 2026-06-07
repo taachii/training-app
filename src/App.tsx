@@ -6,7 +6,7 @@ import FriendsPage  from '@/pages/FriendsPage'
 import PlansPage    from '@/pages/PlansPage'
 import PlanFormPage from '@/pages/PlanFormPage'
 import SessionPage  from '@/pages/SessionPage'
-import StatsPage    from '@/pages/StatsPage'
+import HistoryPage  from '@/pages/HistoryPage'
 import ProfilePage  from '@/pages/ProfilePage'
 
 export default function App() {
@@ -19,7 +19,7 @@ export default function App() {
           <Route path="/rankings" element={<RankingsPage />} />
           <Route path="/friends"  element={<FriendsPage />}  />
           <Route path="/plans"    element={<PlansPage />}    />
-          <Route path="/stats"    element={<StatsPage />}    />
+          <Route path="/history"  element={<HistoryPage />}  />
           <Route path="/profile"  element={<ProfilePage />}  />
           <Route path="*"         element={<HomePage />}     />
         </Route>

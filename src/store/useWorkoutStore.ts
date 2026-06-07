@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import type { WorkoutPlan } from '@/types/workout'
 import type { Exercise } from '@/types/exercise'
 import { PREDEFINED_EXERCISES } from '@/features/workouts/exerciseLibrary'
+import { useScheduleStore } from './useScheduleStore'
 
 interface WorkoutState {
   plans: WorkoutPlan[]
@@ -35,8 +36,10 @@ export const useWorkoutStore = create<WorkoutState>()(
           ),
         })),
 
-      deletePlan: (id) =>
-        set((s) => ({ plans: s.plans.filter((p) => p.id !== id) })),
+      deletePlan: (id) => {
+        set((s) => ({ plans: s.plans.filter((p) => p.id !== id) }))
+        useScheduleStore.getState().removeSchedulesByPlanId(id)
+      },
 
       addCustomExercise: (exercise) =>
         set((s) => ({ exercises: [...s.exercises, exercise] })),

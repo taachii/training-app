@@ -1,13 +1,3 @@
-/**
- * useSessionStore — Active workout session state machine
- *
- * Architecture:
- *  - This store manages WHAT is happening (exercise state, logged sets, XP)
- *  - The SessionPage component manages TIMERS (countdown, elapsed)
- *  - XP is awarded immediately when an exercise is completed
- *  - Progression state is updated when the full session is finalized
- */
-
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { WorkoutPlan, LoggedSet, WorkoutLog, LoggedExercise } from '@/types/workout'
@@ -25,32 +15,33 @@ function genId(): string {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
 }
 
-/**
- * Determine whether a single set meets plan targets.
- * Success = weight >= planned AND reps >= planned.
- */
 function computeSetSuccess(
   weight: number,
   reps: number,
   plannedWeight: number,
   plannedReps: number,
 ): boolean {
-  // Bodyweight exercises (plannedWeight = 0) — only check reps
   if (plannedWeight === 0) return reps >= plannedReps
   return weight >= plannedWeight && reps >= plannedReps
 }
 
-/**
- * Build a SessionExercise from plan + exercise metadata.
- * Suggested weight comes from progression state if available.
- */
 function buildSessionExercise(
   planEx: WorkoutPlan['exercises'][number],
   exercise: Exercise,
   suggestedWeight: number,
 ): SessionExercise {
+  const firstSet = planEx.targetSets[0] || { type: 'reps', reps: 0, weight: 0 }
+  
+  const isBodyweight = exercise.category === 'bodyweight'
+  const isPureBodyweight = isBodyweight && !['weighted_pull_up', 'weighted_chin_up', 'weighted_dip'].includes(exercise.id)
+  
+  const progressionType = planEx.progressionType ?? (isPureBodyweight ? 'reps' : 'weight')
+  const progressionStep = planEx.progressionStep ?? (progressionType === 'reps' ? 1 : 2.5)
+  
   return {
     ...planEx,
+    progressionType,
+    progressionStep,
     exerciseName:      exercise.name,
     exerciseCategory:  exercise.category,
     primaryMuscleGroup: exercise.primaryMuscleGroup,
@@ -58,8 +49,9 @@ function buildSessionExercise(
     exerciseNotes:     exercise.notes,
     status:            'pending',
     currentSetIndex:   0,
-    inputWeight:       suggestedWeight > 0 ? suggestedWeight : (planEx.weight ?? 0),
-    inputReps:         planEx.reps,
+    inputWeight:       suggestedWeight > 0 ? suggestedWeight : (firstSet.weight ?? 0),
+    inputReps:         firstSet.reps ?? 0,
+    inputTimeSeconds:  firstSet.timeSeconds ?? 60,
     loggedSets:        [],
     xpEarned:          0,
     isPersonalRecord:  false,
@@ -67,85 +59,30 @@ function buildSessionExercise(
 }
 
 // ─────────────────────────────────────────────
-// LOG-SET RESULT
+// STORE INTERFACE
 // ─────────────────────────────────────────────
 
 export interface LogSetResult {
-  /** Whether the set met plan targets */
   isSetSuccess: boolean
-  /** True when this was the LAST set of the exercise */
   isLastSetOfExercise: boolean
-  /** Rest duration to apply (from plan) */
   restSeconds: number
-  /** XP awarded (only non-zero when exercise is completed = last set) */
   xpAwarded: number
-  /** Whether a PR was set (only meaningful when isLastSetOfExercise) */
   isPersonalRecord: boolean
+  nextPhase: SessionPhase
 }
-
-// ─────────────────────────────────────────────
-// STORE INTERFACE
-// ─────────────────────────────────────────────
 
 interface SessionState {
   session: ActiveSession | null
 
-  /**
-   * Start a new session from a plan.
-   * progressionWeights maps exerciseId → suggested weight from progression store.
-   */
-  startSession: (
-    plan: WorkoutPlan,
-    exercises: Exercise[],
-  ) => void
-
-  /**
-   * Log the current set with the actual weight and reps.
-   * Returns metadata needed by the component to start the rest timer.
-   */
-  logCurrentSet: (exerciseIndex: number, weight: number, reps: number, previousPR?: number) => LogSetResult
-
-  /**
-   * Mark the session as done early to show the completion screen.
-   */
+  startSession: (plan: WorkoutPlan, exercises: Exercise[]) => void
+  logCurrentSet: (exerciseIndex: number, weight: number, reps: number, timeSeconds: number, previousPR?: number) => LogSetResult
   markSessionDoneEarly: () => void
-
-  /**
-   * Update the inline-editable inputs for a specific exercise (before logging).
-   */
-  updateCurrentInput: (exerciseIndex: number, weight?: number, reps?: number) => void
-
-  /**
-   * Update the total number of sets for a specific exercise.
-   */
+  updateCurrentInput: (exerciseIndex: number, weight?: number, reps?: number, timeSeconds?: number) => void
   updateTotalSets: (exerciseIndex: number, delta: number) => void
-
-  /**
-   * Called by the component when the rest timer expires OR user taps "Pomiń przerwę".
-   * Advances currentExerciseIndex to the next exercise.
-   */
   advanceToNextExercise: (fromIndex: number) => void
-
-  /**
-   * Adjust the carousel view index (swiping back to peek at previous exercises).
-   */
   setViewIndex: (index: number) => void
-
-  /**
-   * Finish the session. If isEarly=true, all remaining 'pending' exercises
-   * are marked 'skipped'. Returns the finalized WorkoutLog.
-   */
-  finishSession: (
-    isEarly: boolean,
-  ) => WorkoutLog
-
-  /**
-   * Called when rest timer expires (non-last-set) or user skips rest for a non-last set.
-   * Transitions session phase back to 'working' so next-set inputs re-appear.
-   */
+  finishSession: (isEarly: boolean) => WorkoutLog
   endRest: () => void
-
-  /** Clear session after it's done */
   clearSession: () => void
 }
 
@@ -158,8 +95,6 @@ export const useSessionStore = create<SessionState>()(
     (set, get) => ({
   session: null,
 
-  // ── startSession ───────────────────────────────────────────────────────
-
   startSession: (plan, exercises) => {
     const exMap = new Map(exercises.map((e) => [e.id, e]))
 
@@ -169,15 +104,12 @@ export const useSessionStore = create<SessionState>()(
       .map((pe) => {
         const ex = exMap.get(pe.exerciseId)
         if (!ex) return null
-
-        const built = buildSessionExercise(pe, ex, pe.weight)
-        return built
+        return buildSessionExercise(pe, ex, pe.targetSets[0]?.weight ?? 0)
       })
       .filter(Boolean) as SessionExercise[]
 
     if (sessionExercises.length === 0) return
 
-    // Activate the first exercise
     sessionExercises[0].status = 'active'
 
     const session: ActiveSession = {
@@ -195,75 +127,119 @@ export const useSessionStore = create<SessionState>()(
     set({ session })
   },
 
-  // ── logCurrentSet ──────────────────────────────────────────────────────
-
-  logCurrentSet: (exerciseIndex, weight, reps, previousPR) => {
+  logCurrentSet: (exerciseIndex, weight, reps, timeSeconds, previousPR) => {
     const { session } = get()
     if (!session) {
-      return { isSetSuccess: false, isLastSetOfExercise: false, restSeconds: 90, xpAwarded: 0, isPersonalRecord: false }
+      return { isSetSuccess: false, isLastSetOfExercise: false, restSeconds: 90, xpAwarded: 0, isPersonalRecord: false, nextPhase: 'resting' }
     }
 
     const exercises = [...session.exercises]
     const idx = exerciseIndex
     const ex = { ...exercises[idx] }
 
-    const isSetSuccess = computeSetSuccess(weight, reps, ex.weight, ex.reps)
+    const target = ex.targetSets[ex.currentSetIndex] || ex.targetSets[ex.targetSets.length - 1]
+    
+    let isSetSuccess = false
+    if (target.type === 'time') {
+       isSetSuccess = timeSeconds >= (target.timeSeconds ?? 0)
+    } else {
+       isSetSuccess = computeSetSuccess(weight, reps, target.weight ?? 0, target.reps ?? 0)
+    }
 
     const newSet: LoggedSet = {
       setNumber:   ex.currentSetIndex + 1,
-      weight,
-      reps,
+      weight:      target.type === 'reps' ? weight : undefined,
+      reps:        target.type === 'reps' ? reps : undefined,
+      timeSeconds: target.type === 'time' ? timeSeconds : undefined,
       completed:   true,
       isSuccess:   isSetSuccess,
       completedAt: new Date().toISOString(),
     }
 
     const loggedSets = [...ex.loggedSets, newSet]
-    const isLastSetOfExercise = ex.currentSetIndex === ex.sets - 1
+    const isLastSetOfExercise = ex.currentSetIndex >= ex.targetSets.length - 1
 
     let xpAwarded = 0
     let isPersonalRecord = false
 
     if (isLastSetOfExercise) {
-      // ── Exercise complete — compute success and award XP ──────────────
       const allSuccess = loggedSets.every((s) => s.isSuccess)
       ex.success = allSuccess
 
-      // Check for PR via Epley 1RM
-      const epley1RM = calculateEpley1RM(weight, reps)
-      const prevBest  = previousPR ?? 0
+      const epley1RM = target.type === 'reps' ? calculateEpley1RM(weight, reps) : 0
+      const prevBest = previousPR ?? 0
       isPersonalRecord = epley1RM > prevBest && ex.useWilksRank
 
-      // XP computation
-      const raw = computeExerciseXP({
-        isSuccessfulProgression: allSuccess,
-        isPersonalRecord,
-      })
-
+      const raw = computeExerciseXP({ isSuccessfulProgression: allSuccess, isPersonalRecord })
       xpAwarded = raw.total
       ex.xpEarned = xpAwarded
       ex.isPersonalRecord = isPersonalRecord
       ex.status = 'completed'
     }
 
-    ex.loggedSets    = loggedSets
+    ex.loggedSets = loggedSets
     ex.currentSetIndex = isLastSetOfExercise ? ex.currentSetIndex : ex.currentSetIndex + 1
-    // Reset inputs for next set (keep same weight, reset reps to plan)
+    
+    // Set up inputs for the NEXT set if there is one
     if (!isLastSetOfExercise) {
-      ex.inputReps = ex.reps
+       const nextTarget = ex.targetSets[ex.currentSetIndex]
+       if (nextTarget) {
+          ex.inputWeight = nextTarget.weight ?? 0
+          ex.inputReps = nextTarget.reps ?? 0
+          ex.inputTimeSeconds = nextTarget.timeSeconds ?? 0
+       }
     }
 
     exercises[idx] = ex
 
-    // Update phase
-    const newPhase: SessionPhase = isLastSetOfExercise ? 'resting_last' : 'resting'
+    // SUPERSET LOGIC
+    let nextPhase: SessionPhase = isLastSetOfExercise ? 'resting_last' : 'resting'
+    let nextExerciseIdx = idx
+
+    if (ex.supersetGroupId) {
+       const targetSetCount = ex.loggedSets.length
+       let foundNextInSuperset = false
+       
+       for (let i = idx + 1; i < exercises.length; i++) {
+         const nextEx = exercises[i]
+         if (nextEx.supersetGroupId === ex.supersetGroupId) {
+            if (nextEx.loggedSets.length < targetSetCount && nextEx.status !== 'skipped' && nextEx.loggedSets.length < nextEx.targetSets.length) {
+               foundNextInSuperset = true
+               nextExerciseIdx = i
+               nextPhase = 'working'
+               break
+            }
+         } else {
+            break
+         }
+       }
+       
+       if (!foundNextInSuperset) {
+          // Time to rest, but point currentExerciseIndex to the first unfinished exercise in the superset group
+          for (let i = 0; i < exercises.length; i++) {
+             const groupEx = exercises[i]
+             if (groupEx.supersetGroupId === ex.supersetGroupId) {
+                if (groupEx.status !== 'completed' && groupEx.status !== 'skipped') {
+                   nextExerciseIdx = i
+                   break
+                }
+             }
+          }
+       }
+    }
+
+    if (nextPhase === 'working' && nextExerciseIdx !== idx) {
+       exercises[nextExerciseIdx].status = 'active'
+    }
 
     set({
       session: {
         ...session,
         exercises,
-        phase:               newPhase,
-        totalXpThisSession:  session.totalXpThisSession + xpAwarded,
+        phase: nextPhase,
+        currentExerciseIndex: nextExerciseIdx,
+        viewIndex: nextExerciseIdx,
+        totalXpThisSession: session.totalXpThisSession + xpAwarded,
       },
     })
 
@@ -273,26 +249,17 @@ export const useSessionStore = create<SessionState>()(
       restSeconds: ex.restSeconds,
       xpAwarded,
       isPersonalRecord,
+      nextPhase,
     }
   },
-
-  // ── markSessionDoneEarly ───────────────────────────────────────────────
 
   markSessionDoneEarly: () => {
     const { session } = get()
     if (!session) return
-    set({
-      session: {
-        ...session,
-        phase: 'done_early',
-        endTime: new Date().toISOString(),
-      },
-    })
+    set({ session: { ...session, phase: 'done_early', endTime: new Date().toISOString() } })
   },
 
-  // ── updateCurrentInput ─────────────────────────────────────────────────
-
-  updateCurrentInput: (exerciseIndex, weight, reps) => {
+  updateCurrentInput: (exerciseIndex, weight, reps, timeSeconds) => {
     const { session } = get()
     if (!session) return
 
@@ -300,6 +267,7 @@ export const useSessionStore = create<SessionState>()(
     const ex = { ...exercises[exerciseIndex] }
     if (weight !== undefined) ex.inputWeight = weight
     if (reps !== undefined) ex.inputReps = reps
+    if (timeSeconds !== undefined) ex.inputTimeSeconds = timeSeconds
     exercises[exerciseIndex] = ex
 
     set({ session: { ...session, exercises } })
@@ -312,15 +280,17 @@ export const useSessionStore = create<SessionState>()(
     const exercises = [...session.exercises]
     const ex = { ...exercises[exerciseIndex] }
     
-    // Prevent reducing sets below what has already been logged or below 1
-    const minSets = Math.max(1, ex.currentSetIndex + 1)
-    ex.sets = Math.max(minSets, Math.min(20, ex.sets + delta))
+    const currentLen = ex.targetSets.length
+    if (delta > 0) {
+       const lastTarget = ex.targetSets[currentLen - 1]
+       ex.targetSets = [...ex.targetSets, { ...lastTarget }]
+    } else if (delta < 0 && currentLen > Math.max(1, ex.currentSetIndex + 1)) {
+       ex.targetSets = ex.targetSets.slice(0, currentLen - 1)
+    }
     
     exercises[exerciseIndex] = ex
     set({ session: { ...session, exercises } })
   },
-
-  // ── advanceToNextExercise ──────────────────────────────────────────────
 
   advanceToNextExercise: (fromIndex) => {
     const { session } = get()
@@ -328,7 +298,6 @@ export const useSessionStore = create<SessionState>()(
 
     const exercises = [...session.exercises]
     
-    // Find next pending exercise with wrap-around
     let nextIdx = -1
     for (let i = 1; i <= exercises.length; i++) {
       const idxToCheck = (fromIndex + i) % exercises.length
@@ -340,7 +309,6 @@ export const useSessionStore = create<SessionState>()(
     }
 
     if (nextIdx === -1) {
-      // All exercises done
       set({
         session: {
           ...session,
@@ -365,16 +333,12 @@ export const useSessionStore = create<SessionState>()(
     })
   },
 
-  // ── setViewIndex ───────────────────────────────────────────────────────
-
   setViewIndex: (index) => {
     const { session } = get()
     if (!session) return
     const clamped = Math.max(0, Math.min(index, session.exercises.length - 1))
     set({ session: { ...session, viewIndex: clamped } })
   },
-
-  // ── finishSession ──────────────────────────────────────────────────────
 
   finishSession: (isEarly) => {
     const { session } = get()
@@ -385,39 +349,39 @@ export const useSessionStore = create<SessionState>()(
     const endMs   = new Date(endTime).getTime()
     const durationSeconds = Math.round((endMs - startMs) / 1000)
 
-    // Mark all remaining pending exercises as skipped
     const exercises = session.exercises.map((ex) =>
       ex.status === 'pending' ? { ...ex, status: 'skipped' as const, xpEarned: 0 } : ex,
     )
 
-    // Compute final XP
     const baseXP = exercises.reduce((sum, ex) => sum + (ex.xpEarned ?? 0), 0)
-
     const hasSkips = exercises.some((ex) => ex.status === 'skipped')
     const fullCompletion = !hasSkips
 
     let totalXpEarned = baseXP
     if (fullCompletion) totalXpEarned += XP_REWARDS.FULL_SESSION_BONUS
 
-    // Build LoggedExercise array
     const progressionStates = useLogStore.getState().progressionStates
     
     const loggedExercises: LoggedExercise[] = exercises.map((ex) => {
       const logged: LoggedExercise = {
         exerciseId:     ex.exerciseId,
-        plannedSets:    ex.sets,
-        plannedReps:    ex.reps,
-        plannedWeight:  ex.weight,
+        plannedSets:    ex.targetSets.length,
         actualSets:     ex.loggedSets,
         success:        ex.success ?? false,
         skipped:        ex.status === 'skipped',
+        supersetGroupId: ex.supersetGroupId,
       }
 
       if (!logged.skipped) {
         const fails = progressionStates[ex.exerciseId]?.consecutiveFails ?? 0
-        const sugg = calculateProgressionSuggestion(logged, fails, ex.progressionType, ex.progressionStep)
-        if (sugg.nextWeight !== logged.plannedWeight) logged.suggestedNextWeight = sugg.nextWeight
-        if (sugg.nextReps !== logged.plannedReps) logged.suggestedNextReps = sugg.nextReps
+        // Find the planned weight/reps from the first set
+        const planWeight = ex.targetSets[0]?.weight ?? 0
+        const planReps = ex.targetSets[0]?.reps ?? 0
+
+        const sugg = calculateProgressionSuggestion(logged, fails, ex.progressionType, ex.progressionStep, planWeight, planReps)
+        
+        if (sugg.nextWeight !== planWeight) logged.suggestedNextWeight = sugg.nextWeight
+        if (sugg.nextReps !== planReps) logged.suggestedNextReps = sugg.nextReps
       }
 
       return logged
@@ -449,15 +413,11 @@ export const useSessionStore = create<SessionState>()(
     return log
   },
 
-  // ── endRest ────────────────────────────────────────────────────────────
-
   endRest: () => {
     const { session } = get()
     if (!session) return
     set({ session: { ...session, phase: 'working' } })
   },
-
-  // ── clearSession ───────────────────────────────────────────────────────
 
   clearSession: () => set({ session: null }),
     }),

@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Trash2, ChevronUp, ChevronDown, Clock, Minus, Plus } from 'lucide-react'
+import { Trash2, ChevronUp, ChevronDown, Clock, Minus, Plus, Settings2, Link } from 'lucide-react'
 import type { Exercise } from '@/types/exercise'
-import type { PlanExercise } from '@/types/workout'
+import type { PlanExercise, TargetSet } from '@/types/workout'
 import { MUSCLE_GROUP_META, CATEGORY_META, REST_PRESETS, formatRest } from '@/lib/muscleGroups'
 
 // ─────────────────────────────────────────────
@@ -106,25 +106,43 @@ interface PlanExerciseRowProps {
   data: PlanExerciseRowData
   index: number
   total: number
+  hasSupersetWithPrev: boolean
+  hasSupersetWithNext?: boolean
   onChange: (updated: PlanExerciseRowData) => void
   onDelete: () => void
   onMoveUp: () => void
   onMoveDown: () => void
+  onToggleSuperset: () => void
 }
 
 export default function PlanExerciseRow({
   data,
   index,
   total,
+  hasSupersetWithPrev,
+  hasSupersetWithNext,
   onChange,
   onDelete,
   onMoveUp,
   onMoveDown,
+  onToggleSuperset,
 }: PlanExerciseRowProps) {
   const [expanded, setExpanded] = useState(false)
-  const { exercise } = data
+  const { exercise, isAdvanced } = data
   const primaryMeta = MUSCLE_GROUP_META[exercise.primaryMuscleGroup]
   const isBodyweight = exercise.category === 'bodyweight'
+  const isCardio = exercise.category === 'cardio'
+  const isTimeBasedExercise = isCardio || exercise.type === 'time'
+  
+  const targetSets = data.targetSets || Array.from({ length: (data as any).sets || 3 }).map(() => ({
+    type: isTimeBasedExercise ? 'time' : 'reps',
+    reps: (data as any).reps || 0,
+    weight: (data as any).weight || 0,
+    timeSeconds: (data as any).timeSeconds || 60
+  })) as TargetSet[]
+  
+  const setsCount = targetSets.length
+  const firstSet = targetSets[0] || { type: isTimeBasedExercise ? 'time' : 'reps', reps: 0, weight: 0, timeSeconds: 60 }
   
   const isPureBodyweight = isBodyweight && !['weighted_pull_up', 'weighted_chin_up', 'weighted_dip'].includes(exercise.id)
 
@@ -136,15 +154,71 @@ export default function PlanExerciseRow({
   const update = (patch: Partial<PlanExercise>) =>
     onChange({ ...data, ...patch })
 
-  const summaryLabel = isPureBodyweight
-    ? `${data.sets}×${data.reps}`
-    : `${data.sets}×${data.reps} @ ${data.weight}kg`
+  const updateSet = (setIndex: number, patch: Partial<TargetSet>) => {
+    const newSets = [...targetSets]
+    newSets[setIndex] = { ...newSets[setIndex], ...patch }
+    update({ targetSets: newSets })
+  }
+
+  // Helpers for Simple Mode
+  // Helpers for Simple Mode
+  
+  const handleGlobalSetsChange = (v: number) => {
+    if (v < setsCount) {
+      update({ targetSets: targetSets.slice(0, v) })
+    } else if (v > setsCount) {
+      const diff = v - setsCount
+      const lastSet = targetSets[setsCount - 1] || firstSet
+      const newSets = Array.from({ length: diff }).map(() => ({ ...lastSet }))
+      update({ targetSets: [...targetSets, ...newSets] })
+    }
+  }
+
+  const handleGlobalRepsChange = (v: number) => {
+    update({ targetSets: targetSets.map(s => ({ ...s, reps: v })) })
+  }
+
+  const handleGlobalWeightChange = (v: number) => {
+    update({ targetSets: targetSets.map(s => ({ ...s, weight: v })) })
+  }
+
+  const handleGlobalTimeChange = (v: number) => {
+    update({ targetSets: targetSets.map(s => ({ ...s, timeSeconds: v })) })
+  }
+
+  const isVaried = targetSets.some(s => s.reps !== firstSet.reps || s.weight !== firstSet.weight || s.timeSeconds !== firstSet.timeSeconds)
+
+  let summaryLabel = ''
+  if (isTimeBasedExercise) {
+    summaryLabel = isVaried ? `${setsCount} serii (zmienne)` : `${setsCount}× ${firstSet.timeSeconds}s`
+  } else {
+    summaryLabel = isPureBodyweight
+      ? (isVaried ? `${setsCount} serii (zmienne)` : `${setsCount}×${firstSet.reps}`)
+      : (isVaried ? `${setsCount} serii (zmienne)` : `${setsCount}×${firstSet.reps} @ ${firstSet.weight}kg`)
+  }
 
   return (
     <div
-      className="rounded-2xl overflow-hidden transition-all"
-      style={{ background: 'var(--color-surface-700)', border: '1px solid var(--color-surface-600)' }}
+      className="rounded-2xl overflow-hidden transition-all relative"
+      style={{ 
+        background: 'var(--color-surface-700)', 
+        border: '1px solid var(--color-surface-600)',
+        borderTopWidth: hasSupersetWithPrev ? '0px' : '1px',
+        borderTopLeftRadius: hasSupersetWithPrev ? '0' : '1rem',
+        borderTopRightRadius: hasSupersetWithPrev ? '0' : '1rem',
+        borderBottomLeftRadius: hasSupersetWithNext ? '0' : '1rem',
+        borderBottomRightRadius: hasSupersetWithNext ? '0' : '1rem',
+        marginTop: hasSupersetWithPrev ? '-12px' : '0'
+      }}
     >
+      {/* Superset indicator bar */}
+      {(hasSupersetWithPrev || hasSupersetWithNext) && (
+        <div 
+          className="absolute left-0 top-0 bottom-0 w-1.5"
+          style={{ background: '#818cf8' }}
+        />
+      )}
+
       {/* Row header */}
       <button
         onClick={() => setExpanded((e) => !e)}
@@ -190,65 +264,147 @@ export default function PlanExerciseRow({
       {/* Expanded controls */}
       {expanded && (
         <div className="px-4 pb-4 flex flex-col gap-4" style={{ borderTop: '1px solid var(--color-surface-600)' }}>
-          {/* Steppers row */}
-          <div className="flex items-start justify-around pt-4">
-            <Stepper
-              label="Serie"
-              value={data.sets}
-              onChange={(v) => update({ sets: v })}
-              min={1}
-              max={20}
-            />
-            <Stepper
-              label="Powt."
-              value={data.reps}
-              onChange={(v) => update({ reps: v })}
-              min={1}
-              max={100}
-            />
-            {!isPureBodyweight && (
-              <div className="flex flex-col items-center gap-1">
-                <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
-                  Ciężar
-                </p>
-                <div className="relative flex items-center">
-                  <input
-                    type="number"
-                    min={0}
-                    max={999}
-                    step={0.25}
-                    value={data.weight === 0 ? '' : data.weight}
-                    onChange={(e) => {
-                      const val = e.target.value
-                      if (val === '') {
-                        update({ weight: 0 })
-                        return
-                      }
-                      update({ weight: parseFloat(val) || 0 })
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.currentTarget.blur()
-                      }
-                    }}
-                    className="h-8 w-20 rounded-xl text-center text-sm font-bold outline-none"
-                    style={{
-                      background: 'var(--color-surface-700)',
-                      color: 'var(--color-text-primary)',
-                      paddingRight: '18px',
-                    }}
-                    placeholder="0"
-                  />
-                  <span
-                    className="absolute right-2.5 text-[10px] font-semibold pointer-events-none"
-                    style={{ color: 'var(--color-text-muted)' }}
-                  >
-                    kg
-                  </span>
-                </div>
-              </div>
-            )}
+          
+          {/* Advanced toggle */}
+          <div className="flex justify-end pt-3">
+             <button 
+                onClick={() => update({ isAdvanced: !isAdvanced })}
+                className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-all"
+                style={{ 
+                  background: isAdvanced ? 'color-mix(in srgb, #6366f1 20%, transparent)' : 'var(--color-surface-600)',
+                  color: isAdvanced ? '#818cf8' : 'var(--color-text-muted)'
+                }}
+             >
+                <Settings2 size={14} />
+                {isAdvanced ? 'Tryb zaawansowany' : 'Tryb prosty'}
+             </button>
           </div>
+
+          {!isAdvanced ? (
+            /* Simple Steppers row */
+            <div className="flex items-start justify-around">
+              <Stepper
+                label="Serie"
+                value={setsCount}
+                onChange={handleGlobalSetsChange}
+                min={1}
+                max={20}
+              />
+              {isTimeBasedExercise ? (
+                <Stepper
+                  label="Czas (s)"
+                  value={firstSet.timeSeconds ?? 60}
+                  onChange={handleGlobalTimeChange}
+                  min={5}
+                  max={3600}
+                  step={5}
+                />
+              ) : (
+                <>
+                  <Stepper
+                    label="Powt."
+                    value={firstSet.reps ?? 0}
+                    onChange={handleGlobalRepsChange}
+                    min={1}
+                    max={100}
+                  />
+                  {!isPureBodyweight && (
+                    <div className="flex flex-col items-center gap-1">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+                        Ciężar
+                      </p>
+                      <div className="relative flex items-center">
+                        <input
+                          type="number"
+                          min={0}
+                          max={999}
+                          step={0.25}
+                          value={firstSet.weight === 0 ? '' : firstSet.weight}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            handleGlobalWeightChange(val === '' ? 0 : (parseFloat(val) || 0))
+                          }}
+                          className="h-8 w-20 rounded-xl text-center text-sm font-bold outline-none"
+                          style={{ background: 'var(--color-surface-700)', color: 'var(--color-text-primary)', paddingRight: '18px' }}
+                          placeholder="0"
+                        />
+                        <span className="absolute right-2.5 text-[10px] font-semibold pointer-events-none" style={{ color: 'var(--color-text-muted)' }}>
+                          kg
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          ) : (
+            /* Advanced Mode: List of Sets */
+            <div className="flex flex-col gap-2">
+               {targetSets.map((set, sIdx) => (
+                  <div key={sIdx} className="flex items-center gap-3 p-2 rounded-xl" style={{ background: 'var(--color-surface-600)' }}>
+                     <div className="w-6 h-6 flex items-center justify-center rounded-md bg-surface-700 text-xs font-bold text-text-muted">
+                        {sIdx + 1}
+                     </div>
+                     
+                     <div className="flex-1 flex gap-2 items-center">
+                        <div className="text-xs font-semibold px-1 w-[80px] text-center text-indigo-400">
+                          {isTimeBasedExercise ? 'Czas' : 'Powt.'}
+                        </div>
+
+                        {isTimeBasedExercise ? (
+                          <div className="flex items-center gap-1 bg-surface-700 px-2 rounded-lg h-8">
+                             <input 
+                               type="number" 
+                               value={set.timeSeconds ?? 0}
+                               onChange={(e) => updateSet(sIdx, { timeSeconds: parseInt(e.target.value) || 0 })}
+                               className="w-12 bg-transparent text-center text-sm font-bold outline-none"
+                             />
+                             <span className="text-[10px] text-text-muted">s</span>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-1 bg-surface-700 px-2 rounded-lg h-8">
+                               <input 
+                                 type="number" 
+                                 value={set.reps ?? 0}
+                                 onChange={(e) => updateSet(sIdx, { reps: parseInt(e.target.value) || 0 })}
+                                 className="w-10 bg-transparent text-center text-sm font-bold outline-none"
+                               />
+                               <span className="text-[10px] text-text-muted">x</span>
+                            </div>
+                            {!isPureBodyweight && (
+                              <div className="flex items-center gap-1 bg-surface-700 px-2 rounded-lg h-8">
+                                 <input 
+                                   type="number" 
+                                   value={set.weight === 0 ? '' : set.weight}
+                                   onChange={(e) => updateSet(sIdx, { weight: parseFloat(e.target.value) || 0 })}
+                                   className="w-12 bg-transparent text-center text-sm font-bold outline-none"
+                                   placeholder="0"
+                                 />
+                                 <span className="text-[10px] text-text-muted">kg</span>
+                              </div>
+                            )}
+                          </>
+                        )}
+                     </div>
+
+                     <button 
+                       onClick={() => update({ targetSets: targetSets.filter((_, i) => i !== sIdx) })}
+                       disabled={targetSets.length === 1}
+                       className="w-8 h-8 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-400/10 disabled:opacity-30"
+                     >
+                       <Trash2 size={14} />
+                     </button>
+                  </div>
+               ))}
+               <button 
+                 onClick={() => update({ targetSets: [...targetSets, { ...targetSets[targetSets.length - 1] }] })}
+                 className="mt-2 py-2 w-full flex items-center justify-center gap-2 text-xs font-bold rounded-xl border border-dashed border-surface-500 text-text-secondary hover:bg-surface-600 transition-all"
+               >
+                 <Plus size={14} /> Dodaj serię
+               </button>
+            </div>
+          )}
 
           {/* Rest selector */}
           <RestSelector value={data.restSeconds} onChange={(v) => update({ restSeconds: v })} />
@@ -311,6 +467,22 @@ export default function PlanExerciseRow({
             >
               <ChevronDown size={16} style={{ color: 'var(--color-text-secondary)' }} />
             </button>
+
+            {/* Superset Toggle */}
+            {index > 0 && (
+              <button
+                onClick={onToggleSuperset}
+                className="flex items-center gap-1.5 px-3 h-9 rounded-xl text-xs font-semibold transition-all active:scale-90"
+                style={{ 
+                  background: hasSupersetWithPrev ? 'color-mix(in srgb, #6366f1 15%, transparent)' : 'var(--color-surface-600)',
+                  color: hasSupersetWithPrev ? '#818cf8' : 'var(--color-text-secondary)',
+                  border: `1px solid ${hasSupersetWithPrev ? 'color-mix(in srgb, #6366f1 30%, transparent)' : 'transparent'}`
+                }}
+              >
+                <Link size={13} />
+                {hasSupersetWithPrev ? 'W superserii' : 'Złącz z poprzednim'}
+              </button>
+            )}
 
             <div className="flex-1" />
 

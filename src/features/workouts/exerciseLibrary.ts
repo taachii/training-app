@@ -624,6 +624,34 @@ export const PREDEFINED_EXERCISES: Exercise[] = [
     defaultWeight: 8,
     defaultRestSeconds: 60,
   },
+  
+  // ── CARDIO / ISOMETRIC (time-based) ──────────────────────────────────
+  {
+    id: 'plank',
+    name: 'Plank',
+    isCustom: false,
+    category: 'bodyweight',
+    primaryMuscleGroup: 'core',
+    secondaryMuscleGroups: ['shoulders'],
+    useWilksRank: false,
+    defaultSets: 3,
+    defaultReps: 0,
+    defaultRestSeconds: 60,
+    type: 'time',
+  },
+  {
+    id: 'treadmill_run',
+    name: 'Treadmill Run',
+    isCustom: false,
+    category: 'cardio',
+    primaryMuscleGroup: 'quadriceps',
+    secondaryMuscleGroups: ['calves', 'glutes', 'hamstrings'],
+    useWilksRank: false,
+    defaultSets: 1,
+    defaultReps: 0,
+    defaultRestSeconds: 0,
+    type: 'time',
+  },
 ]
 
 /**

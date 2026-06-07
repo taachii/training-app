@@ -4,14 +4,20 @@
 
 export type ProgressionType = 'weight' | 'reps' | 'none'
 
+export interface TargetSet {
+  reps?: number
+  weight?: number
+  timeSeconds?: number
+  type: 'reps' | 'time'
+}
+
 export interface PlanExercise {
   /** References Exercise.id */
   exerciseId: string
   order: number
-  sets: number
-  reps: number
-  /** kg; undefined/0 for bodyweight */
-  weight: number
+  targetSets: TargetSet[]
+  /** If true, the user has configured individual sets or time-based config */
+  isAdvanced?: boolean
   /** Rest time between sets (seconds), configured in blueprint editor */
   restSeconds: number
   
@@ -19,6 +25,9 @@ export interface PlanExercise {
   progressionType?: ProgressionType
   /** Step to increase on success (e.g. 2.5 for weight, 1 for reps) */
   progressionStep?: number
+  
+  /** ID used to group exercises into supersets */
+  supersetGroupId?: string
 }
 
 export interface WorkoutPlan {
@@ -54,9 +63,10 @@ export interface ScheduledWorkout {
 
 export interface LoggedSet {
   setNumber: number
-  reps: number
+  reps?: number
   /** Actual weight used (kg) */
-  weight: number
+  weight?: number
+  timeSeconds?: number
   /** Whether this set was performed */
   completed: boolean
   /**
@@ -72,8 +82,6 @@ export interface LoggedSet {
 export interface LoggedExercise {
   exerciseId: string
   plannedSets: number
-  plannedReps: number
-  plannedWeight: number
   actualSets: LoggedSet[]
   /**
    * true  = ALL sets had isSuccess === true (→ +2.5 kg next time)
@@ -87,6 +95,9 @@ export interface LoggedExercise {
   // ── Progression Suggestions ──
   suggestedNextWeight?: number
   suggestedNextReps?: number
+  
+  /** ID used to group exercises into supersets */
+  supersetGroupId?: string
 }
 
 export interface WorkoutLog {

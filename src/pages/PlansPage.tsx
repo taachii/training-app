@@ -21,6 +21,28 @@ function getPlanMuscles(plan: WorkoutPlan, exerciseMap: Map<string, MuscleGroup>
   return [...seen].slice(0, 4)
 }
 
+/** Calculate estimated workout duration in minutes */
+function calculateEstimatedPlanDuration(plan: WorkoutPlan): number {
+  if (plan.exercises.length === 0) return 0;
+  
+  const TIME_PER_SET_SECONDS = 45;
+  const TRANSITION_BETWEEN_EXERCISES_SECONDS = 120;
+  
+  let totalSeconds = 0;
+  
+  for (const ex of plan.exercises) {
+    const setCount = ex.targetSets?.length || 1;
+    const setsTime = setCount * TIME_PER_SET_SECONDS;
+    const restsTime = Math.max(0, setCount - 1) * ex.restSeconds;
+    totalSeconds += setsTime + restsTime;
+  }
+  
+  const transitionsTime = (plan.exercises.length - 1) * TRANSITION_BETWEEN_EXERCISES_SECONDS;
+  totalSeconds += transitionsTime;
+  
+  return Math.ceil(totalSeconds / 60);
+}
+
 // ─────────────────────────────────────────────
 // PLAN CARD
 // ─────────────────────────────────────────────
@@ -36,6 +58,7 @@ interface PlanCardProps {
 function PlanCard({ plan, muscles, isActive, onEdit, onDelete }: PlanCardProps) {
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
+  const estimatedMinutes = calculateEstimatedPlanDuration(plan)
 
   return (
     <div
@@ -65,9 +88,15 @@ function PlanCard({ plan, muscles, isActive, onEdit, onDelete }: PlanCardProps) 
           >
             {plan.name}
           </p>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-            {plan.exercises.length} {plan.exercises.length === 1 ? 'ćwiczenie' : plan.exercises.length < 5 ? 'ćwiczenia' : 'ćwiczeń'}
-          </p>
+          <div className="flex items-center gap-1.5 text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+            <span>{plan.exercises.length} {plan.exercises.length === 1 ? 'ćwiczenie' : plan.exercises.length < 5 ? 'ćwiczenia' : 'ćwiczeń'}</span>
+            {plan.exercises.length > 0 && (
+              <>
+                <span style={{ color: 'var(--color-surface-500)' }}>•</span>
+                <span>~{estimatedMinutes} min</span>
+              </>
+            )}
+          </div>
           {/* Muscle group badges */}
           {muscles.length > 0 && (
             <div className="flex gap-1 mt-1.5 flex-wrap">
@@ -291,7 +320,7 @@ export default function PlansPage() {
             onClick={() => setConfirmDeleteId(null)}
           />
           <div
-            className="fixed z-50 left-4 right-4 bottom-8 rounded-3xl p-6 flex flex-col gap-4 animate-fade-in-up"
+            className="fixed z-50 left-4 right-4 bottom-24 rounded-3xl p-6 flex flex-col gap-4 animate-fade-in-up"
             style={{ background: 'var(--color-surface-800)', border: '1px solid var(--color-surface-500)' }}
           >
             <div className="text-center">

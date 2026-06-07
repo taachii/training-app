@@ -61,6 +61,9 @@ export interface Exercise {
   /** Secondary muscles recruited */
   secondaryMuscleGroups: MuscleGroup[]
 
+  /** 'reps' (default) for strength, 'time' for isometric or cardio */
+  type?: 'reps' | 'time'
+
   /**
    * true  → rank is computed via Wilks formula (barbell big lifts)
    * false → rank is computed via raw reps (bodyweight) or disabled

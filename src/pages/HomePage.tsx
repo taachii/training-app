@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Clock, User } from 'lucide-react'
+import { Clock, User, Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useProfileStore, useLevelProgress, useXpForNextLevel } from '@/store/useProfileStore'
 import { useSessionStore } from '@/store/useSessionStore'
+import { useScheduleStore } from '@/store/useScheduleStore'
+import { useWorkoutStore } from '@/store/useWorkoutStore'
 import LevelBadge from '@/components/ui/LevelBadge'
 import { getLevelMeta } from '@/lib/xpSystem'
 import WeeklyCalendarWidget from '@/components/home/WeeklyCalendarWidget'
@@ -18,8 +20,38 @@ export default function HomePage() {
   const levelMeta = getLevelMeta(level)
   const navigate = useNavigate()
   const { session } = useSessionStore()
+  const { scheduledWorkouts } = useScheduleStore()
+  const { plans } = useWorkoutStore()
 
   const [elapsedSec, setElapsedSec] = useState(0)
+
+  const todayDateStr = [
+    new Date().getFullYear(),
+    String(new Date().getMonth() + 1).padStart(2, '0'),
+    String(new Date().getDate()).padStart(2, '0')
+  ].join('-')
+
+  const uncompletedToday = scheduledWorkouts.filter(w => w.date === todayDateStr && !w.isCompleted)
+  const [selectedPlanIndex, setSelectedPlanIndex] = useState(0)
+
+  const activeScheduled = uncompletedToday[selectedPlanIndex] || uncompletedToday[0] || null
+  const scheduledPlan = activeScheduled ? plans.find(p => p.id === activeScheduled.planId) : null
+
+  const upcomingWorkouts = scheduledWorkouts
+    .filter(w => w.date > todayDateStr && !w.isCompleted)
+    .sort((a, b) => a.date.localeCompare(b.date))
+
+  const nextScheduled = upcomingWorkouts.length > 0 ? upcomingWorkouts[0] : null
+  const nextScheduledPlan = nextScheduled ? plans.find(p => p.id === nextScheduled.planId) : null
+
+  const hasActiveSession = session && session.phase !== 'done' && session.phase !== 'done_early'
+  const activePlan = hasActiveSession && session?.workoutPlanId ? plans.find(p => p.id === session.workoutPlanId) : null
+
+  // Format YYYY-MM-DD to readable short string
+  const formatShortDate = (ds: string) => {
+    const d = new Date(ds)
+    return d.toLocaleDateString('pl-PL', { weekday: 'short', day: 'numeric', month: 'short' })
+  }
 
   useEffect(() => {
     if (!session || session.phase === 'done' || session.phase === 'done_early') return
@@ -40,8 +72,6 @@ export default function HomePage() {
     const s = sec % 60
     return `${m}:${String(s).padStart(2, '0')}`
   }
-
-  const hasActiveSession = session && session.phase !== 'done' && session.phase !== 'done_early'
 
   return (
     <div className="flex flex-col px-4 pt-8 pb-4 gap-6 relative">
@@ -134,12 +164,22 @@ export default function HomePage() {
       </div>
 
       {/* ── QUICK START CTA ── */}
-      <button
-        onClick={() => hasActiveSession ? navigate(`/session/start/${session.workoutPlanId}`) : navigate('/plans')}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => {
+          if (hasActiveSession) navigate(`/session/start/${session.workoutPlanId}`)
+          else if (scheduledPlan) navigate(`/session/start/${scheduledPlan.id}`)
+          else navigate('/plans')
+        }}
         className="w-full relative overflow-hidden rounded-2xl p-5 flex flex-col items-start animate-fade-in-up text-left transition-all duration-200 active:scale-[0.98]"
         style={{
-          background: 'linear-gradient(135deg, #4338ca, #7c3aed)',
-          boxShadow: '0 8px 32px color-mix(in srgb, #6366f1 35%, transparent)',
+          background: scheduledPlan && !hasActiveSession
+            ? 'linear-gradient(135deg, #059669, #10b981)' // Green for scheduled 
+            : 'linear-gradient(135deg, #4338ca, #7c3aed)',
+          boxShadow: scheduledPlan && !hasActiveSession
+            ? '0 8px 32px color-mix(in srgb, #10b981 35%, transparent)'
+            : '0 8px 32px color-mix(in srgb, #6366f1 35%, transparent)',
           animationDelay: '0.08s',
         }}
       >
@@ -148,22 +188,57 @@ export default function HomePage() {
           style={{ background: '#fff' }}
         />
         <div className="relative z-10 w-full flex items-center justify-between mb-1">
-          <p className="text-xs font-semibold uppercase tracking-widest opacity-80" style={{ color: '#c4b5fd' }}>
-            {hasActiveSession ? 'Aktywna sesja' : 'Brak aktywnej sesji'}
+          <p className="text-xs font-semibold uppercase tracking-widest opacity-80" style={{ color: 'rgba(255,255,255,0.7)' }}>
+            {hasActiveSession ? 'Trening w toku' : scheduledPlan ? (uncompletedToday.length > 1 ? `Zaplanowano na dzisiaj (${selectedPlanIndex + 1}/${uncompletedToday.length})` : 'Zaplanowano na dzisiaj') : 'Brak aktywnej sesji'}
           </p>
         </div>
-        <div className="relative z-10 flex items-center gap-3 w-full">
-          <p className="text-xl font-bold text-white">
-            {hasActiveSession ? 'Trening w toku' : 'Rozpocznij trening'}
-          </p>
-          {hasActiveSession && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={{ background: 'rgba(0,0,0,0.2)' }}>
-              <Clock size={14} color="#c4b5fd" />
-              <span className="text-sm font-bold text-white tracking-widest">{formatTime(elapsedSec)}</span>
+        <div className="relative z-10 w-full flex flex-col gap-1">
+          <div className="flex items-center gap-3 w-full min-w-0">
+            {!hasActiveSession && uncompletedToday.length > 1 && scheduledPlan ? (
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setSelectedPlanIndex(prev => (prev > 0 ? prev - 1 : uncompletedToday.length - 1)) }}
+                  className="w-8 h-8 flex items-center justify-center rounded-full transition-all active:scale-90"
+                  style={{ background: 'rgba(255,255,255,0.2)' }}
+                >
+                  <ChevronLeft size={16} color="#fff" />
+                </button>
+                <p className="text-xl font-bold text-white truncate flex-1 text-center">
+                  {scheduledPlan.name}
+                </p>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setSelectedPlanIndex(prev => (prev < uncompletedToday.length - 1 ? prev + 1 : 0)) }}
+                  className="w-8 h-8 flex items-center justify-center rounded-full transition-all active:scale-90"
+                  style={{ background: 'rgba(255,255,255,0.2)' }}
+                >
+                  <ChevronRight size={16} color="#fff" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 min-w-0">
+                <p className="text-xl font-bold text-white truncate">
+                  {hasActiveSession ? (activePlan?.name ?? 'Trening') : scheduledPlan ? scheduledPlan.name : 'Rozpocznij trening'}
+                </p>
+                {hasActiveSession && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg flex-shrink-0" style={{ background: 'rgba(0,0,0,0.2)' }}>
+                    <Clock size={14} color="#c4b5fd" />
+                    <span className="text-sm font-bold text-white tracking-widest">{formatTime(elapsedSec)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {!hasActiveSession && nextScheduled && nextScheduledPlan && (
+            <div className="flex items-center gap-1.5 mt-0.5 opacity-90">
+              <Calendar size={12} color={scheduledPlan ? "#d1fae5" : "#c4b5fd"} />
+              <span className="text-xs font-medium" style={{ color: scheduledPlan ? "#d1fae5" : "#c4b5fd" }}>
+                Następny: {formatShortDate(nextScheduled.date)} ({nextScheduledPlan.name})
+              </span>
             </div>
           )}
         </div>
-      </button>
+      </div>
 
       {/* ── CALENDAR WIDGET ── */}
       <WeeklyCalendarWidget />
