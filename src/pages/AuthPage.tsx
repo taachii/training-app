@@ -5,6 +5,7 @@ import { Dumbbell } from 'lucide-react'
 export default function AuthPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [nickname, setNickname] = useState('')
   const [isLogin, setIsLogin] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -19,7 +20,13 @@ export default function AuthPage() {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
       } else {
-        const { error } = await supabase.auth.signUp({ email, password })
+        const { error } = await supabase.auth.signUp({ 
+          email, 
+          password,
+          options: {
+            data: { nickname }
+          }
+        })
         if (error) throw error
         setError('Zarejestrowano pomyślnie. Zaloguj się teraz!')
         setIsLogin(true)
@@ -56,7 +63,28 @@ export default function AuthPage() {
 
         {/* FORM */}
         <form onSubmit={handleSubmit} className="w-full flex flex-col gap-4">
-          <div>
+          {!isLogin && (
+            <div className="animate-fade-in-up">
+              <label className="block text-xs font-bold uppercase tracking-widest mb-1.5 ml-1" style={{ color: 'var(--color-text-muted)' }}>
+                Nazwa użytkownika
+              </label>
+              <input 
+                type="text" 
+                value={nickname}
+                onChange={e => setNickname(e.target.value)}
+                required={!isLogin}
+                className="w-full p-4 rounded-2xl border-none outline-none font-medium transition-all focus:ring-2"
+                style={{ 
+                  background: 'var(--color-surface-800)', 
+                  color: 'var(--color-text-primary)',
+                  boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)'
+                }}
+                placeholder="Twój Nick"
+              />
+            </div>
+          )}
+
+          <div className="animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
             <label className="block text-xs font-bold uppercase tracking-widest mb-1.5 ml-1" style={{ color: 'var(--color-text-muted)' }}>
               Email
             </label>
@@ -75,7 +103,7 @@ export default function AuthPage() {
             />
           </div>
 
-          <div>
+          <div className="animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
             <label className="block text-xs font-bold uppercase tracking-widest mb-1.5 ml-1" style={{ color: 'var(--color-text-muted)' }}>
               Hasło
             </label>
