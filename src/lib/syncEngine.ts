@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 import { useProfileStore } from '@/store/useProfileStore'
 import { useWorkoutStore } from '@/store/useWorkoutStore'
 import { useLogStore } from '@/store/useLogStore'
+import { totalXpForLevel } from '@/lib/xpSystem'
 import type { WorkoutPlan, WorkoutLog } from '@/types/workout'
 import type { PersonalRecord } from '@/types/ranks'
 import type { ProgressionState } from '@/types/progression'
@@ -88,13 +89,13 @@ async function pullData(userId: string) {
     ])
 
     if (profileData) {
+      const lvl = profileData.level || 1
+      const currentXp = profileData.xp || 0
       useProfileStore.getState().updateProfile({
         name: profileData.nickname,
-        xp: profileData.xp || 0,
-        level: profileData.level || 1,
-        gender: profileData.gender || 'male',
-        weight: profileData.weight || 80,
-        height: profileData.height || 175,
+        xp: currentXp,
+        level: lvl,
+        totalXp: totalXpForLevel(lvl) + currentXp,
       })
     }
 
