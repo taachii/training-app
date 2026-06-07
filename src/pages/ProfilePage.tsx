@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useProfileStore, useLevelProgress, useXpForNextLevel } from '@/store/useProfileStore'
+import { supabase } from '@/lib/supabase'
 import { getLevelMeta, MAX_LEVEL, LEVEL_TIERS } from '@/lib/xpSystem'
 import { User, Weight, Ruler, ChevronRight, Zap, TrendingUp, Info, X } from 'lucide-react'
 import RanksOverviewWidget from '@/components/home/RanksOverviewWidget'
@@ -284,6 +285,19 @@ export default function ProfilePage() {
       <div className="animate-fade-in-up" style={{ animationDelay: '0.25s' }}>
         <RanksOverviewWidget />
       </div>
+
+      {/* ── LOGOUT BUTTON ── */}
+      <div className="animate-fade-in-up mt-6" style={{ animationDelay: '0.3s' }}>
+        <button 
+          onClick={async () => await supabase.auth.signOut()}
+          className="w-full p-4 rounded-2xl font-bold text-sm tracking-widest uppercase transition-all active:scale-[0.98]"
+          style={{ background: 'var(--color-surface-800)', color: 'var(--color-danger)' }}
+        >
+          Wyloguj się
+        </button>
+      </div>
+
+      <div className="h-24" /> {/* spacer for bottom nav */}
 
       <TiersModal isOpen={showTiersModal} onClose={() => setShowTiersModal(false)} />
     </div>
