@@ -16,6 +16,7 @@ export default function LogDetailsModal({ log, onClose }: LogDetailsModalProps) 
 
   useEffect(() => {
     if (log) {
+      setShowConfirm(false)
       document.body.style.overflow = 'hidden'
       return () => { document.body.style.overflow = 'unset' }
     }

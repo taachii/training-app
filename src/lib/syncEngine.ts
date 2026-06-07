@@ -156,6 +156,15 @@ async function pushWorkoutPlans(plans: WorkoutPlan[]) {
   const { data: authData } = await supabase.auth.getUser()
   if (!authData.user) return
 
+  const { data: existing } = await supabase.from('workout_plans').select('id').eq('user_id', authData.user.id)
+  const existingIds = new Set(existing?.map(e => e.id) || [])
+  const currentIds = new Set(plans.map(p => p.id))
+  
+  const toDelete = [...existingIds].filter(id => !currentIds.has(id))
+  if (toDelete.length > 0) {
+    await supabase.from('workout_plans').delete().in('id', toDelete)
+  }
+
   const payloads = plans.map(p => ({
     id: p.id,
     user_id: authData.user.id,
@@ -164,7 +173,6 @@ async function pushWorkoutPlans(plans: WorkoutPlan[]) {
     updated_at: p.updatedAt || new Date().toISOString()
   }))
 
-  // Upsert all plans
   if (payloads.length > 0) {
     await supabase.from('workout_plans').upsert(payloads)
   }
@@ -173,6 +181,15 @@ async function pushWorkoutPlans(plans: WorkoutPlan[]) {
 async function pushWorkoutLogs(logs: WorkoutLog[]) {
   const { data: authData } = await supabase.auth.getUser()
   if (!authData.user) return
+
+  const { data: existing } = await supabase.from('workout_logs').select('id').eq('user_id', authData.user.id)
+  const existingIds = new Set(existing?.map(e => e.id) || [])
+  const currentIds = new Set(logs.map(l => l.id))
+  
+  const toDelete = [...existingIds].filter(id => !currentIds.has(id))
+  if (toDelete.length > 0) {
+    await supabase.from('workout_logs').delete().in('id', toDelete)
+  }
 
   const payloads = logs.map(l => ({
     id: l.id,
