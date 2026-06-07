@@ -9,11 +9,13 @@ export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    setSuccessMsg(null)
 
     try {
       if (isLogin) {
@@ -28,7 +30,7 @@ export default function AuthPage() {
           }
         })
         if (error) throw error
-        setError('Zarejestrowano pomyślnie. Zaloguj się teraz!')
+        setSuccessMsg('Zarejestrowano pomyślnie. Zaloguj się teraz!')
         setIsLogin(true)
       }
     } catch (err: any) {
@@ -129,6 +131,12 @@ export default function AuthPage() {
             </div>
           )}
 
+          {successMsg && (
+            <div className="p-4 rounded-2xl text-sm font-bold text-center mt-2" style={{ background: 'color-mix(in srgb, var(--color-success-500) 15%, transparent)', color: 'var(--color-success-400)' }}>
+              {successMsg}
+            </div>
+          )}
+
           <button 
             type="submit" 
             disabled={loading}
@@ -149,9 +157,15 @@ export default function AuthPage() {
           onClick={() => {
             setIsLogin(!isLogin)
             setError(null)
+            setSuccessMsg(null)
           }}
-          className="mt-8 text-sm font-bold tracking-wide transition-colors"
-          style={{ color: 'var(--color-brand-400)' }}
+          className="mt-8 px-6 py-3 rounded-2xl text-sm font-bold tracking-wide transition-all active:scale-[0.95]"
+          style={{ 
+            color: 'var(--color-text-primary)',
+            background: 'color-mix(in srgb, var(--color-surface-600) 50%, transparent)',
+            border: '1px solid var(--color-surface-500)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+          }}
         >
           {isLogin ? 'Nie masz konta? Zarejestruj się' : 'Masz już konto? Zaloguj się'}
         </button>
