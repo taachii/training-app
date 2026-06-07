@@ -3,11 +3,9 @@ import { createPortal } from 'react-dom'
 import { useProfileStore, useLevelProgress, useXpForNextLevel } from '@/store/useProfileStore'
 import { supabase } from '@/lib/supabase'
 import { getLevelMeta, MAX_LEVEL, LEVEL_TIERS } from '@/lib/xpSystem'
-import { User, Weight, Ruler, ChevronRight, Zap, TrendingUp, Info, X } from 'lucide-react'
+import { Zap, TrendingUp, Info, X } from 'lucide-react'
 import RanksOverviewWidget from '@/components/home/RanksOverviewWidget'
 import LevelBadge from '@/components/ui/LevelBadge'
-
-const GENDER_LABELS = { male: 'Mężczyzna', female: 'Kobieta' }
 
 // ─────────────────────────────────────────────
 // LEVEL PROGRESS DETAIL
@@ -169,20 +167,11 @@ export default function ProfilePage() {
   })
 
   const name    = profile?.name ?? '—'
-  const gender  = profile?.gender
-  const weight  = profile?.weight
-  const height  = profile?.height
   const level   = profile?.level ?? 1
   const xp      = profile?.xp ?? 0
   const totalXp = profile?.totalXp ?? 0
   const xpForNext = useXpForNextLevel()
   const meta    = getLevelMeta(level)
-
-  const physicalRows = [
-    { label: 'Płeć',   value: gender ? GENDER_LABELS[gender] : '—', Icon: User   },
-    { label: 'Waga',   value: weight  ? `${weight} kg`         : '—', Icon: Weight },
-    { label: 'Wzrost', value: height  ? `${height} cm`         : '—', Icon: Ruler  },
-  ]
 
   return (
     <div className="flex flex-col px-4 pt-8 pb-4 gap-5 relative">
@@ -242,43 +231,6 @@ export default function ProfilePage() {
       {/* ── LEVEL PROGRESS ── */}
       <div className="animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
         <LevelProgressCard level={level} xp={xp} />
-      </div>
-
-      {/* ── PHYSICAL DATA ── */}
-      <div
-        className="rounded-2xl overflow-hidden animate-fade-in-up"
-        style={{
-          background: 'var(--color-surface-800)',
-          border: '1px solid var(--color-surface-600)',
-          animationDelay: '0.2s',
-        }}
-      >
-        <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--color-surface-600)' }}>
-          <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
-            Dane fizyczne (Wilks)
-          </p>
-        </div>
-        {physicalRows.map(({ label, value, Icon }, i) => (
-          <div
-            key={label}
-            className="flex items-center gap-3 px-4 py-3.5"
-            style={{ borderBottom: i < physicalRows.length - 1 ? '1px solid var(--color-surface-600)' : 'none' }}
-          >
-            <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ background: 'color-mix(in srgb, #6366f1 15%, transparent)' }}
-            >
-              <Icon size={15} style={{ color: '#818cf8' }} />
-            </div>
-            <span className="flex-1 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-              {label}
-            </span>
-            <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
-              {value}
-            </span>
-            <ChevronRight size={14} style={{ color: 'var(--color-text-muted)' }} />
-          </div>
-        ))}
       </div>
 
       {/* ── LOGOUT BUTTON ── */}
