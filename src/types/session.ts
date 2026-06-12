@@ -85,6 +85,9 @@ export interface ActiveSession {
 
   exercises: SessionExercise[]
 
+  /** true when this is a freestyle "custom" session (no plan, no progression) */
+  isCustom?: boolean
+
   /** Index of the exercise currently being performed */
   currentExerciseIndex: number
 

@@ -42,9 +42,9 @@ export type ExerciseCategory =
   | 'barbell'
   | 'dumbbell'
   | 'bodyweight'
+  | 'weighted_bodyweight'
   | 'machine'
   | 'cable'
-  | 'cardio'
 
 export interface Exercise {
   id: string

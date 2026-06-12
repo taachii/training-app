@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Dumbbell, ChevronRight, Trash2, MoreVertical } from 'lucide-react'
+import { Plus, Dumbbell, ChevronRight, Trash2, MoreVertical, Shuffle } from 'lucide-react'
 import { useWorkoutStore } from '@/store/useWorkoutStore'
 import { MUSCLE_GROUP_META } from '@/lib/muscleGroups'
 import type { MuscleGroup } from '@/types/exercise'
@@ -261,6 +261,28 @@ export default function PlansPage() {
 
       {/* Content */}
       <div className="relative z-10 flex flex-col gap-3 px-4 pb-24">
+        {/* Custom session card — always visible */}
+        <button
+          onClick={() => navigate('/session/custom')}
+          className="flex items-center gap-4 w-full rounded-2xl px-4 py-4 mb-1 transition-all active:scale-[0.98] animate-fade-in-up"
+          style={{
+            background: 'linear-gradient(135deg, rgba(16,185,129,0.15) 0%, rgba(5,150,105,0.1) 100%)',
+            border: '1px solid rgba(16,185,129,0.3)',
+          }}
+        >
+          <div
+            className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'linear-gradient(135deg, #059669, #10b981)', boxShadow: '0 4px 14px rgba(16,185,129,0.35)' }}
+          >
+            <Shuffle size={22} color="#fff" />
+          </div>
+          <div className="flex-1 text-left">
+            <p className="font-bold text-sm" style={{ color: '#34d399' }}>Trening własny</p>
+            <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.45)' }}>Dodawaj ćwiczenia na bieżąco — bez planu</p>
+          </div>
+          <ChevronRight size={18} style={{ color: 'rgba(52,211,153,0.6)', flexShrink: 0 }} />
+        </button>
+
         {plans.length === 0 ? (
           /* Empty state */
           <div

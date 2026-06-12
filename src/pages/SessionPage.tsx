@@ -1,17 +1,19 @@
 import { useEffect, useRef, useState, useCallback, useLayoutEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { X, ChevronLeft, ChevronRight, Zap, Clock, Trophy, Check, Plus, Minus, ChevronDown, ChevronUp, Link } from 'lucide-react'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
+import { X, ChevronLeft, ChevronRight, Zap, Clock, Trophy, Check, Plus, Minus, ChevronDown, ChevronUp, Link, Timer, Shuffle } from 'lucide-react'
 
 import { useSessionStore } from '@/store/useSessionStore'
 import { useWorkoutStore } from '@/store/useWorkoutStore'
 import { XP_REWARDS } from '@/lib/xpSystem'
 import XpSummaryAnimation from '@/components/workouts/XpSummaryAnimation'
+import ExercisePicker from '@/components/workouts/ExercisePicker'
 import { useLogStore } from '@/store/useLogStore'
 import { useProfileStore } from '@/store/useProfileStore'
 import { useScheduleStore } from '@/store/useScheduleStore'
 import { MUSCLE_GROUP_META } from '@/lib/muscleGroups'
 import type { SessionExercise } from '@/types/session'
 import type { WorkoutLog } from '@/types/workout'
+import type { Exercise } from '@/types/exercise'
 
 // ─────────────────────────────────────────────
 // HELPERS
@@ -167,11 +169,15 @@ interface ExerciseCardProps {
   onNextExercise: () => void
   isResting: boolean
   isLastInSession?: boolean
+  isCustomSession?: boolean
+  onAddExercise?: () => void
 }
+
 
 function ExerciseCard({
   exercise, isCurrent, planIndex, totalCount,
   onUpdateWeight, onUpdateReps, onUpdateTime, onUpdateSets, onLogSet, onNextExercise, isResting, isLastInSession,
+  isCustomSession, onAddExercise,
 }: ExerciseCardProps) {
   const muscleMeta = MUSCLE_GROUP_META[exercise.primaryMuscleGroup]
   const isSkipped = exercise.status === 'skipped'
@@ -180,6 +186,52 @@ function ExerciseCard({
 
   const isBodyweight = exercise.exerciseCategory === 'bodyweight'
   const isPureBodyweight = isBodyweight && !['weighted_pull_up', 'weighted_chin_up', 'weighted_dip'].includes(exercise.exerciseId)
+
+  // ── In-app timer state (only for time-based sets)
+  const [exTimerActive, setExTimerActive] = useState(false)
+
+  const [exTimerSec, setExTimerSec] = useState(0)
+  const [exTimerTotal, setExTimerTotal] = useState(0)
+  const [exTimerDone, setExTimerDone] = useState(false)
+  const [failSeconds, setFailSeconds] = useState<number | null>(null)
+  const exTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const startExTimer = useCallback((targetSecs: number) => {
+    if (exTimerRef.current) clearInterval(exTimerRef.current)
+    setExTimerSec(targetSecs)
+    setExTimerTotal(targetSecs)
+    setExTimerActive(true)
+    setExTimerDone(false)
+    setFailSeconds(null)
+    if (navigator.vibrate) navigator.vibrate(30)
+    exTimerRef.current = setInterval(() => {
+      setExTimerSec(prev => {
+        if (prev <= 1) {
+          clearInterval(exTimerRef.current!)
+          setExTimerActive(false)
+          setExTimerDone(true)
+          if (navigator.vibrate) navigator.vibrate([100, 50, 100])
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }, [])
+
+  const stopExTimer = useCallback(() => {
+    if (exTimerRef.current) clearInterval(exTimerRef.current)
+    setExTimerActive(false)
+  }, [])
+
+  // Reset timer state when set changes
+  const prevSetIndexRef = useRef(exercise.currentSetIndex)
+  if (prevSetIndexRef.current !== exercise.currentSetIndex) {
+    prevSetIndexRef.current = exercise.currentSetIndex
+    if (exTimerRef.current) clearInterval(exTimerRef.current)
+    setExTimerActive(false)
+    setExTimerDone(false)
+    setFailSeconds(null)
+  }
 
   return (
     <div
@@ -300,21 +352,165 @@ function ExerciseCard({
             const isTimeBased = currentTarget?.type === 'time'
 
             if (isTimeBased) {
+              const targetSecs = exercise.inputTimeSeconds
+              const timerProgress = exTimerTotal > 0 ? exTimerSec / exTimerTotal : 0
+              const timerRadius = 60
+              const timerCirc = 2 * Math.PI * timerRadius
+              const timerOffset = timerCirc * (1 - timerProgress)
+              const isTimerUrgent = exTimerActive && exTimerSec <= 5
+
               return (
-                <div className="flex flex-col items-center gap-1 mb-5">
-                  <p className="text-[10px] uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                    Czas
-                  </p>
-                  <Stepper
-                    value={exercise.inputTimeSeconds}
-                    onIncrement={() => onUpdateTime(5)}
-                    onDecrement={() => onUpdateTime(-5)}
-                    suffix="s"
-                    disabled={isResting}
-                  />
-                  <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                    Plan: {currentTarget.timeSeconds} s
-                  </p>
+                <div className="flex-1 w-full flex flex-col items-center justify-center mb-2 relative">
+                  {/* Target time stepper (only when timer not active) */}
+                  {!exTimerActive && !exTimerDone && (
+                    <div className="flex flex-col items-center gap-1 w-full relative z-10">
+                      <p className="text-[10px] uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.4)' }}>Cel</p>
+                      <Stepper
+                        value={targetSecs}
+                        onIncrement={() => onUpdateTime(5)}
+                        onDecrement={() => onUpdateTime(-5)}
+                        suffix="s"
+                        disabled={isResting}
+                      />
+                      <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.35)' }}>Plan: {currentTarget.timeSeconds} s</p>
+                      
+                      {/* Timer controls */}
+                      <button
+                        onClick={() => startExTimer(targetSecs)}
+                        disabled={isResting}
+                        className="w-full py-4 mt-6 rounded-2xl font-black text-base transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+                        style={{
+                          background: 'linear-gradient(135deg, #0d9488, #14b8a6)',
+                          color: '#fff',
+                          boxShadow: '0 4px 20px rgba(20,184,166,0.4)',
+                          fontFamily: 'var(--font-display)',
+                          fontSize: '15px',
+                        }}
+                      >
+                        <Timer size={18} />
+                        Start serii {exercise.currentSetIndex + 1}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Countdown ring */}
+                  {(exTimerActive || exTimerDone) && (
+                    <div className="relative flex-1 w-full flex flex-col items-center justify-center">
+                      <div 
+                        className="transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] relative flex items-center justify-center" 
+                        style={{ 
+                          width: 180, height: 180,
+                          transform: exTimerDone ? 'translateY(-30px) scale(0.9)' : 'translateY(0) scale(1)'
+                        }}
+                      >
+                        <svg width="180" height="180" viewBox="0 0 180 180" aria-hidden="true">
+                          <circle cx="90" cy="90" r={timerRadius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="7" />
+                          <circle
+                            cx="90" cy="90" r={timerRadius}
+                            fill="none"
+                            stroke={exTimerDone ? '#22c55e' : isTimerUrgent ? '#ef4444' : '#2dd4bf'}
+                            strokeWidth="7"
+                            strokeLinecap="round"
+                            strokeDasharray={timerCirc}
+                            strokeDashoffset={timerOffset}
+                            transform="rotate(-90 90 90)"
+                            style={{ transition: 'stroke-dashoffset 1s linear, stroke 0.3s ease' }}
+                          />
+                        </svg>
+                        <div className="absolute flex flex-col items-center">
+                          {exTimerDone ? (
+                            <span className="text-4xl text-green-500 animate-in zoom-in duration-300">✓</span>
+                          ) : (
+                            <>
+                              <span className="font-black text-3xl" style={{ fontFamily: 'var(--font-display)', color: isTimerUrgent ? '#f87171' : '#fff', lineHeight: 1 }}>
+                                {formatTime(exTimerSec)}
+                              </span>
+                              <span className="text-[10px] mt-0.5 uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.5)' }}>czas</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Reset timera (Active) */}
+                      <div 
+                        className="absolute top-[calc(50%+100px)] left-0 right-0 flex justify-center transition-all duration-500"
+                        style={{
+                          opacity: exTimerActive && !exTimerDone ? 1 : 0,
+                          transform: exTimerActive && !exTimerDone ? 'translateY(0)' : 'translateY(-10px)',
+                          pointerEvents: exTimerActive && !exTimerDone ? 'auto' : 'none'
+                        }}
+                      >
+                        <button
+                          onClick={stopExTimer}
+                          className="text-xs font-medium py-2 px-4 rounded-lg active:scale-95 transition-all"
+                          style={{ color: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.05)' }}
+                        >
+                          Reset timera
+                        </button>
+                      </div>
+
+                      {/* Buttons (Done & failSeconds === null) */}
+                      <div 
+                        className="absolute top-[calc(50%+65px)] left-0 right-0 w-full flex flex-col gap-3 transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] px-4"
+                        style={{
+                          opacity: exTimerDone && failSeconds === null ? 1 : 0,
+                          transform: exTimerDone && failSeconds === null ? 'translateY(0)' : 'translateY(20px)',
+                          pointerEvents: exTimerDone && failSeconds === null ? 'auto' : 'none'
+                        }}
+                      >
+                        <p className="text-center text-sm font-semibold" style={{ color: '#2dd4bf' }}>Czas upłynął</p>
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => { onLogSet(); setExTimerDone(false); }}
+                            className="flex-1 py-3 rounded-2xl font-black text-sm transition-all active:scale-95"
+                            style={{ background: 'linear-gradient(135deg, #16a34a, #22c55e)', color: '#fff', boxShadow: '0 4px 14px rgba(34,197,94,0.35)' }}
+                          >
+                            Sukces
+                          </button>
+                          <button
+                            onClick={() => setFailSeconds(0)}
+                            className="flex-1 py-3 rounded-2xl font-black text-sm transition-all active:scale-95"
+                            style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)' }}
+                          >
+                            Porażka
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Fail Stepper (Done & failSeconds !== null) */}
+                      <div 
+                        className="absolute top-[calc(50%+65px)] left-0 right-0 w-full flex flex-col gap-4 transition-all duration-500 ease-out px-4"
+                        style={{
+                          opacity: exTimerDone && failSeconds !== null ? 1 : 0,
+                          transform: exTimerDone && failSeconds !== null ? 'translateY(0)' : 'translateY(20px)',
+                          pointerEvents: exTimerDone && failSeconds !== null ? 'auto' : 'none'
+                        }}
+                      >
+                        <p className="text-center text-sm font-semibold" style={{ color: 'rgba(255,255,255,0.7)' }}>Ile sekund dałeś radę?</p>
+                        <div className="flex justify-center">
+                          <Stepper
+                            value={failSeconds === 0 ? Math.max(1, Math.floor(targetSecs / 2)) : failSeconds}
+                            onIncrement={() => setFailSeconds(prev => Math.min(targetSecs - 1, (prev ?? 0) + 1))}
+                            onDecrement={() => setFailSeconds(prev => Math.max(1, (prev ?? 1) - 1))}
+                            suffix="s"
+                          />
+                        </div>
+                        <button
+                          onClick={() => {
+                            const actualSecs = failSeconds === 0 ? Math.max(1, Math.floor(targetSecs / 2)) : failSeconds
+                            onUpdateTime((actualSecs ?? 0) - targetSecs)
+                            onLogSet()
+                            setExTimerDone(false)
+                            setFailSeconds(null)
+                          }}
+                          className="w-full py-4 rounded-2xl font-black text-base transition-all active:scale-95"
+                          style={{ background: '#fff', color: '#000', fontFamily: 'var(--font-display)' }}
+                        >
+                          Zapisz wynik
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             }
@@ -390,23 +586,29 @@ function ExerciseCard({
             )
           })()}
 
-          {/* Log set button */}
-          <button
-            onClick={onLogSet}
-            disabled={isResting}
-            className="w-full py-4 rounded-2xl font-black text-base transition-all active:scale-[0.98] disabled:opacity-50"
-            style={{
-              background: 'linear-gradient(135deg, #4338ca, #7c3aed)',
-              color: '#fff',
-              boxShadow: '0 4px 20px rgba(99,102,241,0.4)',
-              fontFamily: 'var(--font-display)',
-              fontSize: '15px',
-              letterSpacing: '0.02em',
-            }}
-            aria-label="Zakończ serię"
-          >
-            ✓ Zakończ serię {exercise.currentSetIndex + 1}
-          </button>
+          {/* Log set button — only for reps-based exercises */}
+          {(() => {
+            const currentTarget = exercise.targetSets[exercise.currentSetIndex] || exercise.targetSets[exercise.targetSets.length - 1]
+            if (currentTarget?.type === 'time') return null
+            return (
+              <button
+                onClick={onLogSet}
+                disabled={isResting}
+                className="w-full py-4 rounded-2xl font-black text-base transition-all active:scale-[0.98] disabled:opacity-50"
+                style={{
+                  background: 'linear-gradient(135deg, #4338ca, #7c3aed)',
+                  color: '#fff',
+                  boxShadow: '0 4px 20px rgba(99,102,241,0.4)',
+                  fontFamily: 'var(--font-display)',
+                  fontSize: '15px',
+                  letterSpacing: '0.02em',
+                }}
+                aria-label="Zakończ serię"
+              >
+                ✓ Zakończ serię {exercise.currentSetIndex + 1}
+              </button>
+            )
+          })()}
         </>
       )}
 
@@ -448,20 +650,38 @@ function ExerciseCard({
 
           {/* Add "Następne ćwiczenie" button if this is the active session current exercise and it's done */}
           {isCurrent && isDone && (
-            <button
-              onClick={onNextExercise}
-              className="w-full mt-4 py-4 rounded-2xl font-black text-base transition-all active:scale-[0.98]"
-              style={{
-                background: 'linear-gradient(135deg, #4338ca, #7c3aed)',
-                color: '#fff',
-                boxShadow: '0 4px 20px rgba(99,102,241,0.4)',
-                fontFamily: 'var(--font-display)',
-                fontSize: '15px',
-                letterSpacing: '0.02em',
-              }}
-            >
-              {isLastInSession ? 'Zakończ trening →' : 'Następne ćwiczenie →'}
-            </button>
+            <div className="flex flex-col gap-3 mt-4">
+              {isCustomSession && isLastInSession && (
+                <button
+                  onClick={onAddExercise}
+                  className="w-full py-4 rounded-2xl font-black text-base transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                  style={{
+                    background: 'linear-gradient(135deg, #059669, #10b981)',
+                    color: '#fff',
+                    boxShadow: '0 4px 20px rgba(16,185,129,0.3)',
+                    fontFamily: 'var(--font-display)',
+                    fontSize: '15px',
+                  }}
+                >
+                  <Plus size={18} />
+                  Dodaj kolejne ćwiczenie
+                </button>
+              )}
+              <button
+                onClick={onNextExercise}
+                className="w-full py-4 rounded-2xl font-black text-base transition-all active:scale-[0.98]"
+                style={{
+                  background: 'linear-gradient(135deg, #4338ca, #7c3aed)',
+                  color: '#fff',
+                  boxShadow: '0 4px 20px rgba(99,102,241,0.4)',
+                  fontFamily: 'var(--font-display)',
+                  fontSize: '15px',
+                  letterSpacing: '0.02em',
+                }}
+              >
+                {isLastInSession ? 'Zakończ trening →' : 'Następne ćwiczenie →'}
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -478,9 +698,12 @@ interface RestTimerProps {
   totalSeconds: number
   onAdjust: (delta: number) => void
   onSkip: () => void
+  exerciseName?: string
+  setInfo?: string
+  nextInfo?: string
 }
 
-function RestTimer({ seconds, totalSeconds, onAdjust, onSkip }: RestTimerProps) {
+function RestTimer({ seconds, totalSeconds, onAdjust, onSkip, exerciseName, setInfo, nextInfo }: RestTimerProps) {
   const progress = totalSeconds > 0 ? seconds / totalSeconds : 0
   const radius = 72
   const circ = 2 * Math.PI * radius
@@ -488,7 +711,15 @@ function RestTimer({ seconds, totalSeconds, onAdjust, onSkip }: RestTimerProps) 
   const isUrgent = seconds <= 10 && seconds > 0
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center gap-8 px-6">
+    <div className="flex-1 flex flex-col items-center justify-center gap-6 px-6">
+      {/* Context info — what was just done */}
+      {exerciseName && (
+        <div className="text-center">
+          <p className="text-sm font-bold" style={{ color: '#fff' }}>{exerciseName}</p>
+          {setInfo && <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.45)' }}>{setInfo}</p>}
+        </div>
+      )}
+
       {/* SVG countdown ring */}
       <div className="relative flex items-center justify-center" style={{ width: 180, height: 180 }}>
         <svg width="180" height="180" viewBox="0 0 180 180" aria-hidden="true">
@@ -529,6 +760,17 @@ function RestTimer({ seconds, totalSeconds, onAdjust, onSkip }: RestTimerProps) 
         </div>
       </div>
 
+      {/* Next step info */}
+      {nextInfo && (
+        <div
+          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl"
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}
+        >
+          <span className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>Następnie:</span>
+          <span className="text-xs font-semibold" style={{ color: 'rgba(255,255,255,0.8)' }}>{nextInfo}</span>
+        </div>
+      )}
+
       {/* Adjust buttons */}
       <div className="flex items-center gap-3">
         <button
@@ -567,15 +809,17 @@ interface DoneScreenProps {
   planName: string
   log: WorkoutLog | null
   initialTotalXp: number
-  onClose: (applySuggestions: boolean) => void
+  onClose: (applySuggestions: boolean, customName?: string) => void
 }
 
 function DoneScreen({ planName, log, initialTotalXp, onClose }: DoneScreenProps) {
   const [applySuggestions, setApplySuggestions] = useState(true)
   const [suggestionsExpanded, setSuggestionsExpanded] = useState(false)
+  const [customName, setCustomName] = useState('')
   const exercisesDB = useWorkoutStore((s) => s.exercises)
 
   if (!log) return null
+  const isCustom = log.workoutPlanId === 'custom'
 
   const hasSuggestions = log.exercises.some(ex => !ex.skipped && (ex.suggestedNextWeight !== undefined || ex.suggestedNextReps !== undefined))
   const completedCount = log.exercises.filter(ex => !ex.skipped).length
@@ -591,7 +835,24 @@ function DoneScreen({ planName, log, initialTotalXp, onClose }: DoneScreenProps)
         <h1 className="text-2xl font-black mb-1" style={{ fontFamily: 'var(--font-display)', color: '#fff' }}>
           Trening ukończony!
         </h1>
-        <p className="text-sm mb-6" style={{ color: 'rgba(255,255,255,0.5)' }}>{planName}</p>
+        {isCustom ? (
+          <input
+            type="text"
+            value={customName}
+            onChange={(e) => setCustomName(e.target.value)}
+            className="text-sm mb-6 bg-transparent outline-none text-center transition-colors focus:border-indigo-400"
+            style={{
+              color: '#fff',
+              borderBottom: '1px solid rgba(255,255,255,0.2)',
+              width: '80%',
+              paddingBottom: 4,
+            }}
+            placeholder="Nazwij swój trening..."
+            maxLength={40}
+          />
+        ) : (
+          <p className="text-sm mb-6" style={{ color: 'rgba(255,255,255,0.5)' }}>{planName}</p>
+        )}
         
         <XpSummaryAnimation 
           initialTotalXp={initialTotalXp} 
@@ -709,7 +970,7 @@ function DoneScreen({ planName, log, initialTotalXp, onClose }: DoneScreenProps)
       )}
 
       <button
-        onClick={() => onClose(applySuggestions)}
+        onClick={() => onClose(applySuggestions, isCustom && customName.trim() ? customName.trim() : undefined)}
         className="w-full py-4 rounded-2xl font-bold text-base transition-all active:scale-95"
         style={{
           background: 'linear-gradient(135deg, #4338ca, #7c3aed)',
@@ -740,12 +1001,14 @@ interface CarouselProps {
   onNextExercise: () => void
   onSwipePrev: () => void
   onSwipeNext: () => void
+  isCustomSession?: boolean
+  onAddExercise?: () => void
 }
 
 function Carousel({
   exercises, viewIndex,
   isResting, onUpdateWeight, onUpdateReps, onUpdateTime, onUpdateSets, onLogSet, onNextExercise,
-  onSwipePrev, onSwipeNext,
+  onSwipePrev, onSwipeNext, isCustomSession, onAddExercise
 }: CarouselProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerH, setContainerH] = useState(0)
@@ -835,6 +1098,8 @@ function Carousel({
                 onNextExercise={onNextExercise}
                 isResting={isResting}
                 isLastInSession={isLastInSession}
+                isCustomSession={isCustomSession}
+                onAddExercise={onAddExercise}
               />
             </div>
           </div>
@@ -851,10 +1116,14 @@ function Carousel({
 export default function SessionPage() {
   const navigate = useNavigate()
   const { planId } = useParams<{ planId?: string }>()
+  const location = useLocation()
+  const isCustomRoute = location.pathname === '/session/custom'
 
-  const { session, startSession, logCurrentSet, updateCurrentInput, updateTotalSets,
+  const { session, startSession, startCustomSession, addExerciseToSession, logCurrentSet, updateCurrentInput, updateTotalSets,
     advanceToNextExercise, setViewIndex,
     finishSession, clearSession, endRest, markSessionDoneEarly } = useSessionStore()
+
+  const [showExercisePicker, setShowExercisePicker] = useState(false)
 
   const isDone = session?.phase === 'done' || session?.phase === 'done_early'
   const [finalLog, setFinalLog] = useState<WorkoutLog | null>(null)
@@ -914,6 +1183,14 @@ export default function SessionPage() {
   // NOTE: plans.length is in deps because Zustand persist rehydrates
   // asynchronously. Without it, this effect fires before plans are loaded.
   useEffect(() => {
+    // Custom session route
+    if (isCustomRoute) {
+      if (!session?.isCustom) {
+        startCustomSession()
+      }
+      return
+    }
+
     if (!planId) return
     if (plans.length === 0) return  // wait for persist rehydration
 
@@ -928,7 +1205,7 @@ export default function SessionPage() {
       setElapsedSec(0)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [planId, plans.length])
+  }, [planId, plans.length, isCustomRoute])
 
   // ── Elapsed clock ──
   useEffect(() => {
@@ -997,7 +1274,8 @@ export default function SessionPage() {
       })
     }
 
-    if (result.nextPhase.startsWith('resting')) {
+    // Only start rest timer for non-last sets; last set goes straight to summary
+    if (result.nextPhase === 'resting') {
       startRestTimer(ex.restSeconds)
     }
   }, [session, logCurrentSet, addXP, updatePersonalRecord, personalRecords, startRestTimer])
@@ -1055,10 +1333,12 @@ export default function SessionPage() {
     setShowConfirmEarly(true)
   }, [session])
 
-  const handleDone = useCallback((applySuggestions: boolean) => {
+  const handleDone = useCallback((applySuggestions: boolean, customName?: string) => {
     if (!session || !finalLog) return
-    addLog(finalLog)
-    finalLog.exercises.forEach((ex) => {
+    const logToSave = customName ? { ...finalLog, planName: customName } : finalLog
+    
+    addLog(logToSave)
+    logToSave.exercises.forEach((ex) => {
       if (!ex.skipped) updateProgressionAfterSession(ex)
     })
 
@@ -1211,6 +1491,25 @@ export default function SessionPage() {
           totalSeconds={restTotal}
           onAdjust={handleAdjustRest}
           onSkip={handleSkipRest}
+          exerciseName={session.exercises[session.currentExerciseIndex]?.exerciseName}
+          setInfo={(() => {
+            const ex = session.exercises[session.currentExerciseIndex]
+            if (!ex) return undefined
+            return `Seria ${ex.loggedSets.length} z ${ex.targetSets.length} zrobiona`
+          })()}
+          nextInfo={(() => {
+            const ex = session.exercises[session.currentExerciseIndex]
+            if (!ex) return undefined
+            const isLastSetOfEx = ex.loggedSets.length >= ex.targetSets.length
+            if (!isLastSetOfEx) {
+              return `Seria ${ex.loggedSets.length + 1} — ${ex.exerciseName}`
+            }
+            // Find next pending exercise
+            const nextEx = session.exercises.find(
+              (e, i) => i > session.currentExerciseIndex && (e.status === 'pending' || e.status === 'active')
+            )
+            return nextEx ? nextEx.exerciseName : 'Ostatnia seria!'
+          })()}
         />
       ) : (
         <>
@@ -1240,6 +1539,16 @@ export default function SessionPage() {
 
             {/* Stats chips */}
             <div className="flex items-center gap-2">
+              {session.isCustom && (
+                <button
+                  onClick={() => setShowExercisePicker(true)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-90"
+                  style={{ background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.3)' }}
+                  aria-label="Dodaj ćwiczenie"
+                >
+                  <Plus size={16} style={{ color: '#34d399' }} />
+                </button>
+              )}
               {session.totalXpThisSession > 0 && (
                 <div
                   className="flex items-center gap-1 px-2.5 py-1 rounded-full"
@@ -1310,27 +1619,52 @@ export default function SessionPage() {
             </button>
           </div>
 
-          {/* ── CAROUSEL ── */}
-          <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
-            <Carousel
-              exercises={session.exercises}
-              viewIndex={session.viewIndex}
-              isResting={isResting && restSec > 0}
-              onUpdateWeight={handleUpdateWeight}
-              onUpdateReps={handleUpdateReps}
-              onUpdateTime={handleUpdateTime}
-              onUpdateSets={handleUpdateSets}
-              onLogSet={() => handleLogSet(session.viewIndex)}
-              onNextExercise={() => advanceToNextExercise(session.viewIndex)}
-              onSwipePrev={() => {
-                if (session.viewIndex > 0) setViewIndex(session.viewIndex - 1)
-              }}
-              onSwipeNext={() => {
-                if (session.viewIndex < session.exercises.length - 1) setViewIndex(session.viewIndex + 1)
-              }}
-            />
-
-          </div>
+          {/* Custom mode: empty state */}
+          {session.isCustom && session.exercises.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-5 px-8">
+              <div
+                className="w-20 h-20 rounded-2xl flex items-center justify-center"
+                style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.2), rgba(5,150,105,0.1))', border: '1px solid rgba(16,185,129,0.3)' }}
+              >
+                <Shuffle size={36} style={{ color: '#34d399' }} />
+              </div>
+              <div className="text-center">
+                <p className="font-bold text-lg text-white" style={{ fontFamily: 'var(--font-display)' }}>Trening własny</p>
+                <p className="text-sm mt-2" style={{ color: 'rgba(255,255,255,0.5)' }}>Dodaj pierwsze ćwiczenie, żeby zacząć</p>
+              </div>
+              <button
+                onClick={() => setShowExercisePicker(true)}
+                className="flex items-center gap-2 px-6 py-3 rounded-2xl font-bold text-sm transition-all active:scale-95"
+                style={{ background: 'linear-gradient(135deg, #059669, #10b981)', color: '#fff', boxShadow: '0 4px 20px rgba(16,185,129,0.35)' }}
+              >
+                <Plus size={18} />
+                Dodaj ćwiczenie
+              </button>
+            </div>
+          ) : (
+            <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+              {/* ── CAROUSEL ── */}
+              <Carousel
+                exercises={session.exercises}
+                viewIndex={session.viewIndex}
+                isResting={isResting && restSec > 0}
+                onUpdateWeight={handleUpdateWeight}
+                onUpdateReps={handleUpdateReps}
+                onUpdateTime={handleUpdateTime}
+                onUpdateSets={handleUpdateSets}
+                onLogSet={() => handleLogSet(session.viewIndex)}
+                onNextExercise={() => advanceToNextExercise(session.viewIndex)}
+                onSwipePrev={() => {
+                  if (session.viewIndex > 0) setViewIndex(session.viewIndex - 1)
+                }}
+                onSwipeNext={() => {
+                  if (session.viewIndex < session.exercises.length - 1) setViewIndex(session.viewIndex + 1)
+                }}
+                isCustomSession={session.isCustom}
+                onAddExercise={() => setShowExercisePicker(true)}
+              />
+            </div>
+          )}
 
           {/* ── BOTTOM BAR ── */}
           {!isResting && !isDone && (
@@ -1355,6 +1689,19 @@ export default function SessionPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* Exercise picker modal (custom session) */}
+      {session.isCustom && (
+        <ExercisePicker
+          isOpen={showExercisePicker}
+          onClose={() => setShowExercisePicker(false)}
+          onSelect={(ex: Exercise) => {
+            addExerciseToSession(ex)
+            setShowExercisePicker(false)
+          }}
+          existingIds={session.exercises.map(e => e.exerciseId)}
+        />
       )}
     </div>
   )

@@ -107,7 +107,9 @@ export default function WeeklyCalendarWidget() {
             String(day.getDate()).padStart(2, '0')
           ].join('-')
           
-          const hasWorkouts = scheduledWorkouts.some(sw => sw.date === dateStr && !sw.isCompleted)
+          const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+          const isPast = day.getTime() < todayStart.getTime()
+          const hasWorkouts = !isPast && scheduledWorkouts.some(sw => sw.date === dateStr && !sw.isCompleted)
 
           return (
             <button 

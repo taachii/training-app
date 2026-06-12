@@ -63,6 +63,7 @@ export default function App() {
         <Route path="/plans/:id/edit"   element={<PlanFormPage />} />
         <Route path="/session"               element={<SessionPage />} />
         <Route path="/session/start/:planId"  element={<SessionPage />} />
+        <Route path="/session/custom"         element={<SessionPage />} />
       </Routes>
     </BrowserRouter>
   )

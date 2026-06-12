@@ -35,9 +35,14 @@ function buildSessionExercise(
   
   const isBodyweight = exercise.category === 'bodyweight'
   const isPureBodyweight = isBodyweight && !['weighted_pull_up', 'weighted_chin_up', 'weighted_dip'].includes(exercise.id)
+  const isTimeBased = firstSet.type === 'time'
   
-  const progressionType = planEx.progressionType ?? (isPureBodyweight ? 'reps' : 'weight')
-  const progressionStep = planEx.progressionStep ?? (progressionType === 'reps' ? 1 : 2.5)
+  const progressionType = planEx.progressionType ?? (
+    isTimeBased ? 'time' : isPureBodyweight ? 'reps' : 'weight'
+  )
+  const progressionStep = planEx.progressionStep ?? (
+    progressionType === 'time' ? 5 : progressionType === 'reps' ? 1 : 2.5
+  )
   
   return {
     ...planEx,
@@ -76,6 +81,8 @@ interface SessionState {
   session: ActiveSession | null
 
   startSession: (plan: WorkoutPlan, exercises: Exercise[]) => void
+  startCustomSession: () => void
+  addExerciseToSession: (exercise: Exercise) => void
   logCurrentSet: (exerciseIndex: number, weight: number, reps: number, timeSeconds: number, previousPR?: number) => LogSetResult
   markSessionDoneEarly: () => void
   updateCurrentInput: (exerciseIndex: number, weight?: number, reps?: number, timeSeconds?: number) => void
@@ -127,6 +134,57 @@ export const useSessionStore = create<SessionState>()(
     }
 
     set({ session })
+  },
+
+  startCustomSession: () => {
+    const session: ActiveSession = {
+      id:                   `session_${genId()}`,
+      workoutPlanId:        'custom',
+      planName:             'Trening własny',
+      isCustom:             true,
+      phase:                'working',
+      exercises:            [],
+      currentExerciseIndex: 0,
+      viewIndex:            0,
+      totalXpThisSession:   0,
+      initialTotalXp:       useProfileStore.getState().profile?.totalXp ?? 0,
+      startTime:            new Date().toISOString(),
+    }
+    set({ session })
+  },
+
+  addExerciseToSession: (exercise) => {
+    const { session } = get()
+    if (!session) return
+
+    const isBodyweight = exercise.category === 'bodyweight'
+    const isPureBodyweight = isBodyweight && !['weighted_pull_up', 'weighted_chin_up', 'weighted_dip'].includes(exercise.id)
+    const defaultSets = exercise.defaultSets ?? 3
+    const defaultReps = exercise.defaultReps ?? 10
+    const defaultWeight = exercise.defaultWeight ?? 20
+    const defaultRestSeconds = exercise.defaultRestSeconds ?? 90
+    const defaultTime = 30
+
+    const newPlanEx: WorkoutPlan['exercises'][number] = {
+      exerciseId:      exercise.id,
+      order:           session.exercises.length,
+      targetSets:      Array.from({ length: defaultSets }, () => ({
+        type:        'reps' as const,
+        reps:        defaultReps,
+        weight:      isPureBodyweight ? 0 : defaultWeight,
+        timeSeconds: defaultTime,
+      })),
+      restSeconds:     defaultRestSeconds,
+      progressionType: 'none' as const,   // custom sessions: no auto-progression
+    }
+
+    const newEx = buildSessionExercise(newPlanEx, exercise, isPureBodyweight ? 0 : defaultWeight)
+    newEx.status = session.exercises.length === 0 ? 'active' : 'pending'
+
+    const exercises = [...session.exercises, newEx]
+    // If this is the first exercise being added, start it
+    const currentExerciseIndex = session.exercises.length === 0 ? 0 : session.currentExerciseIndex
+    set({ session: { ...session, exercises, currentExerciseIndex } })
   },
 
   logCurrentSet: (exerciseIndex, weight, reps, timeSeconds, previousPR) => {
@@ -374,16 +432,20 @@ export const useSessionStore = create<SessionState>()(
         supersetGroupId: ex.supersetGroupId,
       }
 
-      if (!logged.skipped) {
+      if (!logged.skipped && !session.isCustom) {
         const fails = progressionStates[ex.exerciseId]?.consecutiveFails ?? 0
-        // Find the planned weight/reps from the first set
+        // Find the planned weight/reps/time from the first set
         const planWeight = ex.targetSets[0]?.weight ?? 0
         const planReps = ex.targetSets[0]?.reps ?? 0
 
-        const sugg = calculateProgressionSuggestion(logged, fails, ex.progressionType, ex.progressionStep, planWeight, planReps)
-        
-        if (sugg.nextWeight !== planWeight) logged.suggestedNextWeight = sugg.nextWeight
-        if (sugg.nextReps !== planReps) logged.suggestedNextReps = sugg.nextReps
+        const isTimeBased = ex.targetSets[0]?.type === 'time'
+
+        if (!isTimeBased) {
+          const sugg = calculateProgressionSuggestion(logged, fails, ex.progressionType, ex.progressionStep, planWeight, planReps)
+          
+          if (sugg.nextWeight !== planWeight) logged.suggestedNextWeight = sugg.nextWeight
+          if (sugg.nextReps !== planReps) logged.suggestedNextReps = sugg.nextReps
+        }
       }
 
       return logged

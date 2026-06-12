@@ -2,7 +2,7 @@
 // WORKOUT PLAN (Blueprint)
 // ─────────────────────────────────────────────
 
-export type ProgressionType = 'weight' | 'reps' | 'none'
+export type ProgressionType = 'weight' | 'reps' | 'time' | 'none'
 
 export interface TargetSet {
   reps?: number

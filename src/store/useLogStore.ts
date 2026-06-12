@@ -39,7 +39,7 @@ function roundWeight(kg: number): number {
 export function calculateProgressionSuggestion(
   logged: LoggedExercise,
   prevFails: number,
-  type: 'weight' | 'reps' | 'none' = 'weight',
+  type: 'weight' | 'reps' | 'time' | 'none' = 'weight',
   step?: number,
   plannedWeight: number = 0,
   plannedReps: number = 0
@@ -60,7 +60,7 @@ export function calculateProgressionSuggestion(
   let nextReps = type === 'reps' ? effectiveReps : plannedReps
   let consecutiveFails = prevFails
 
-  if (type === 'none') {
+  if (type === 'none' || type === 'time') {
     return { nextWeight, nextReps, consecutiveFails }
   }
 
@@ -79,7 +79,7 @@ export function calculateProgressionSuggestion(
       if (type === 'weight') {
         nextWeight = roundWeight(Math.max(0, effectiveWeight - actualStep))
       } else if (type === 'reps') {
-        nextReps = Math.max(1, effectiveReps - 1) // always -1 rep on deload
+        nextReps = Math.max(1, effectiveReps - 1)
       }
       consecutiveFails = 0
     }
