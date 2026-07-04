@@ -513,7 +513,7 @@ export default function ExercisePicker({
                 </p>
               ) : (
                 filtered.map((ex) => {
-                  const primaryMeta = MUSCLE_GROUP_META[ex.primaryMuscleGroup]
+                  const primaryMeta = MUSCLE_GROUP_META[ex.primaryMuscleGroup] || { label: 'Inne', shortLabel: 'Inne', color: '#9ca3af' }
                   const alreadyAdded = existingIds.includes(ex.id)
                   return (
                     <button

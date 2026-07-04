@@ -43,15 +43,16 @@ export const MUSCLE_GROUP_META: Record<MuscleGroup, MuscleGroupMeta> = {
 
 interface CategoryMeta {
   label: string
+  icon: string
 }
 
 export const CATEGORY_META: Record<ExerciseCategory, CategoryMeta> = {
-  barbell:             { label: 'Sztanga' },
-  dumbbell:            { label: 'Hantle' },
-  cable:               { label: 'Kable' },
-  machine:             { label: 'Maszyny' },
-  bodyweight:          { label: 'Własna waga' },
-  weighted_bodyweight: { label: 'Z obciążeniem' },
+  barbell:             { label: 'Sztanga', icon: '🏋️' },
+  dumbbell:            { label: 'Hantle', icon: '💪' },
+  cable:               { label: 'Kable', icon: '⛓️' },
+  machine:             { label: 'Maszyny', icon: '🦾' },
+  bodyweight:          { label: 'Własna waga', icon: '🤸' },
+  weighted_bodyweight: { label: 'Z obciążeniem', icon: '🏋️' },
 }
 
 export type MainSegment = 'weights' | 'machines' | 'calisthenics'
@@ -66,7 +67,7 @@ export const SEGMENT_ORDER: MainSegment[] = ['weights', 'machines', 'calisthenic
 
 /** Ordered list of all categories for filter UI */
 export const CATEGORY_ORDER: ExerciseCategory[] = [
-  'barbell', 'dumbbell', 'cable', 'machine', 'bodyweight', 'weighted_bodyweight',
+  'barbell', 'dumbbell', 'cable', 'machine', 'bodyweight', 'weighted_bodyweight'
 ]
 
 // ─────────────────────────────────────────────

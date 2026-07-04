@@ -129,10 +129,9 @@ export default function PlanExerciseRow({
 }: PlanExerciseRowProps) {
   const [expanded, setExpanded] = useState(false)
   const { exercise, isAdvanced } = data
-  const primaryMeta = MUSCLE_GROUP_META[exercise.primaryMuscleGroup]
+  const primaryMeta = MUSCLE_GROUP_META[exercise.primaryMuscleGroup] || { label: 'Inne', shortLabel: 'Inne', color: '#9ca3af' }
   const isBodyweight = exercise.category === 'bodyweight'
-  const isCardio = exercise.category === 'cardio'
-  const isTimeBasedExercise = isCardio || exercise.type === 'time'
+  const isTimeBasedExercise = exercise.type === 'time'
   
   const targetSets = data.targetSets || Array.from({ length: (data as any).sets || 3 }).map(() => ({
     type: isTimeBasedExercise ? 'time' : 'reps',
@@ -233,7 +232,7 @@ export default function PlanExerciseRow({
         </div>
 
         {/* Category icon + name */}
-        <span className="text-base flex-shrink-0">{CATEGORY_META[exercise.category].icon}</span>
+        <span className="text-base flex-shrink-0">{CATEGORY_META[exercise.category]?.icon || '❓'}</span>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>
             {exercise.name}
